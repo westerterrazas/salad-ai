@@ -13,7 +13,6 @@ su - $USER -c "
 /opt/TurboVNC/bin/vncserver -kill :1 >/dev/null 2>&1 || true
 "
 
-
 rm -f /tmp/.X1-lock
 rm -f /tmp/.X11-unix/X1
 rm -f /home/$USER/.vnc/*:1.pid
@@ -23,7 +22,7 @@ rm -f /home/$USER/.vnc/*:1.log
 mkdir -p /home/$USER/.vnc
 
 
-# crear password VNC
+# Crear password VNC
 if [ ! -f /home/$USER/.vnc/passwd ]; then
 
     echo "Creando password VNC"
@@ -48,7 +47,7 @@ cat > /home/$USER/.vnc/xstartup.turbovnc <<'EOF'
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
 
-startxfce4 &
+exec startxfce4
 EOF
 
 
@@ -61,7 +60,8 @@ echo "Arrancando servidor..."
 
 su - $USER -c "
 /opt/TurboVNC/bin/vncserver :1 \
--geometry 1920x1080
+-geometry 1920x1080 \
+-rfbport 5901
 "
 
 
