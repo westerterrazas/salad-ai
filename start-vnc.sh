@@ -13,6 +13,7 @@ su - $USER -c "
 /opt/TurboVNC/bin/vncserver -kill :1 >/dev/null 2>&1 || true
 "
 
+
 rm -f /tmp/.X1-lock
 rm -f /tmp/.X11-unix/X1
 rm -f /home/$USER/.vnc/*:1.pid
@@ -26,7 +27,8 @@ if [ ! -f /home/$USER/.vnc/passwd ]; then
 
     echo "Creando password VNC"
 
-    echo "salad123" | /opt/TurboVNC/bin/vncpasswd -f \
+    echo "salad123" | \
+    /opt/TurboVNC/bin/vncpasswd -f \
     > /home/$USER/.vnc/passwd
 
     chmod 600 /home/$USER/.vnc/passwd
@@ -40,8 +42,7 @@ echo "Arrancando servidor..."
 
 su - $USER -c "
 /opt/TurboVNC/bin/vncserver :1 \
--geometry 1920x1080 \
--localhost no
+-geometry 1920x1080
 "
 
 
@@ -52,7 +53,3 @@ echo "=============================="
 
 
 ss -ltnp | grep 5901 || true
-
-
-# mantener vivo Salad
-tail -f /dev/null
