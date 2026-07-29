@@ -3,8 +3,11 @@ FROM nvidia/cuda:13.1.0-runtime-ubuntu24.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV USER=ia
 ENV HOME=/home/ia
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
-# Paquetes base + XFCE + herramientas
+
+# Paquetes base + escritorio XFCE + VNC
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
@@ -21,13 +24,16 @@ RUN apt-get update && apt-get install -y \
     xauth \
     x11-xserver-utils \
     mesa-utils \
+    xterm \
+    locales \
     python3 \
     python3-pip \
     ca-certificates \
+    && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
 
-# Instalar TurboVNC
+# TurboVNC
 RUN wget -q \
     https://github.com/TurboVNC/turbovnc/releases/download/3.3/turbovnc_3.3_amd64.deb \
     -O /tmp/turbovnc.deb \
@@ -37,12 +43,12 @@ RUN wget -q \
     && rm -rf /var/lib/apt/lists/*
 
 
-# Crear usuario IA
+# Usuario IA
 RUN useradd -m -s /bin/bash ia \
     && echo "ia ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 
-# Directorios necesarios
+# Directorios
 RUN mkdir -p \
         /home/ia/.vnc \
         /tmp/.X11-unix \
@@ -53,17 +59,16 @@ RUN mkdir -p \
     && chown -R ia:ia /home/ia
 
 
-# Copiar scripts
+# Scripts
 COPY setup.sh /workspace/setup.sh
 COPY start-vnc.sh /workspace/start-vnc.sh
 COPY launch.sh /workspace/launch.sh
 
 
-# Permisos
 RUN chmod +x /workspace/*.sh
 
 
 WORKDIR /workspace
 
 
-CMD ["/workspace/launch.sh"]
+ENTRYPOINT ["/workspace/launch.sh"]

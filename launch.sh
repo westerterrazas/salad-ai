@@ -8,16 +8,21 @@ echo " Salad AI Container"
 echo "================================="
 
 
+echo ""
+echo "[1/2] Preparando entorno..."
 bash "$DIR/setup.sh"
 
 
+echo ""
+echo "[2/2] Iniciando escritorio VNC..."
 bash "$DIR/start-vnc.sh"
 
 
 echo ""
 echo "================================="
-echo " LISTO"
+echo " Salad AI LISTO"
 echo "================================="
 
 
-tail -f /dev/null
+# Mantener vivo el contenedor
+exec tail -f /dev/null
