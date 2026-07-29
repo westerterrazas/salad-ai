@@ -2,16 +2,38 @@
 set -e
 
 USER=ia
+TURBOVNC=/opt/TurboVNC/bin
 
 echo "=============================="
 echo " Iniciando TurboVNC"
 echo "=============================="
 
 
-# limpiar sesión anterior
+# comprobar instalación
+if [ ! -f "$TURBOVNC/vncserver" ]; then
+    echo "ERROR: TurboVNC no encontrado"
+    ls -lah /opt
+    exit 1
+fi
+
+
+# localizar vncpasswd
+if [ -f "$TURBOVNC/vncpasswd" ]; then
+    VNCPASS="$TURBOVNC/vncpasswd"
+elif command -v vncpasswd >/dev/null 2>&1; then
+    VNCPASS="$(command -v vncpasswd)"
+else
+    echo "ERROR: vncpasswd no encontrado"
+    exit 1
+fi
+
+
+echo "Limpiando sesión anterior..."
+
 su - $USER -c "
-/opt/TurboVNC/bin/vncserver -kill :1 >/dev/null 2>&1 || true
+$TURBOVNC/vncserver -kill :1 >/dev/null 2>&1 || true
 "
+
 
 rm -f /tmp/.X1-lock
 rm -f /tmp/.X11-unix/X1
@@ -22,13 +44,13 @@ rm -f /home/$USER/.vnc/*:1.log
 mkdir -p /home/$USER/.vnc
 
 
-# Crear password VNC
+# password VNC
 if [ ! -f /home/$USER/.vnc/passwd ]; then
 
     echo "Creando password VNC"
 
     echo "salad123" | \
-    /opt/TurboVNC/bin/vncpasswd -f \
+    $VNCPASS -f \
     > /home/$USER/.vnc/passwd
 
 fi
@@ -52,14 +74,14 @@ EOF
 
 
 chmod +x /home/$USER/.vnc/xstartup.turbovnc
-chown $USER:$USER /home/$USER/.vnc/xstartup.turbovnc
+chown $USER:$USER /home/$USER/.vnc/xstartup.turbovvnc 2>/dev/null || true
 
 
 echo "Arrancando servidor..."
 
 
 su - $USER -c "
-/opt/TurboVNC/bin/vncserver :1 \
+$TURBOVNC/vncserver :1 \
 -geometry 1920x1080 \
 -rfbport 5901
 "
