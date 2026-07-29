@@ -1,16 +1,17 @@
 #!/bin/bash
 set -e
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "================================="
 echo " Salad AI Container"
 echo "================================="
 
 
-bash ./setup.sh
+bash "$DIR/setup.sh"
 
 
-bash ./start-vnc.sh
+bash "$DIR/start-vnc.sh"
 
 
 echo ""

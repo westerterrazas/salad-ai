@@ -4,8 +4,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV USER=ia
 ENV HOME=/home/ia
 
-# Paquetes base + escritorio XFCE + herramientas
-RUN apt update && apt install -y \
+# Paquetes base + XFCE + herramientas
+RUN apt-get update && apt-get install -y \
     wget \
     curl \
     git \
@@ -31,9 +31,10 @@ RUN apt update && apt install -y \
 RUN wget -q \
     https://github.com/TurboVNC/turbovnc/releases/download/3.3/turbovnc_3.3_amd64.deb \
     -O /tmp/turbovnc.deb \
-    && apt update \
-    && apt install -y /tmp/turbovnc.deb \
-    && rm -f /tmp/turbovnc.deb
+    && apt-get update \
+    && apt-get install -y /tmp/turbovnc.deb \
+    && rm -f /tmp/turbovnc.deb \
+    && rm -rf /var/lib/apt/lists/*
 
 
 # Crear usuario IA
@@ -52,7 +53,7 @@ RUN mkdir -p \
     && chown -R ia:ia /home/ia
 
 
-# Copiar scripts de inicio
+# Copiar scripts
 COPY setup.sh /workspace/setup.sh
 COPY start-vnc.sh /workspace/start-vnc.sh
 COPY launch.sh /workspace/launch.sh
@@ -65,5 +66,4 @@ RUN chmod +x /workspace/*.sh
 WORKDIR /workspace
 
 
-# Arranque automático Salad
 CMD ["/workspace/launch.sh"]
