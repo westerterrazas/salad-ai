@@ -1,16 +1,16 @@
 #!/bin/bash
 set -e
 
-echo "================================="
-echo "Preparando entorno Salad"
-echo "================================="
+echo "=============================="
+echo " Preparando Salad AI"
+echo "=============================="
 
 
-mkdir -p /models
 mkdir -p /data
+mkdir -p /models
 
 
-echo "GPU disponible:"
+echo "GPU:"
 nvidia-smi
 
 
@@ -18,4 +18,4 @@ echo "Python:"
 python3 --version
 
 
-echo "Entorno listo"
+echo "Configuración terminada"

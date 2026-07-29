@@ -1,9 +1,1 @@
-torch
-torchvision
-torchaudio
-numpy
-opencv-python
-pillow
-tqdm
-requests
-huggingface_hub
+# futuro
