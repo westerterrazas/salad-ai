@@ -18,7 +18,6 @@ ENV LANG=en_US.UTF-8 \
     HISTFILE=/dev/null \
     PYTHONHISTFILE=/dev/null
 
-# Dependencias base, escritorio, VNC, Tor y herramientas.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -52,12 +51,14 @@ RUN apt-get update \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
-# Firefox DEB oficial de Mozilla, evitando el paquete Snap de Ubuntu.
+# Firefox oficial de Mozilla.
 RUN install -d -m 0755 /etc/apt/keyrings \
+    && install -d -m 0700 /tmp/gnupg \
     && wget -q \
         https://packages.mozilla.org/apt/repo-signing-key.gpg \
         -O /etc/apt/keyrings/packages.mozilla.org.asc \
-    && HUELLA="$(gpg --batch --quiet --show-keys --with-colons \
+    && HUELLA="$(GNUPGHOME=/tmp/gnupg \
+        gpg --batch --quiet --show-keys --with-colons \
         /etc/apt/keyrings/packages.mozilla.org.asc \
         | awk -F: '$1=="fpr"{print $10; exit}')" \
     && test "${HUELLA}" = "35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3" \
@@ -70,9 +71,8 @@ RUN install -d -m 0755 /etc/apt/keyrings \
         > /etc/apt/preferences.d/mozilla \
     && apt-get update \
     && apt-get install -y --no-install-recommends firefox \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /tmp/gnupg /var/lib/apt/lists/*
 
-# Políticas de privacidad y proxy SOCKS5 mediante Tor.
 RUN install -d -m 0755 /etc/firefox/policies \
     && cat > /etc/firefox/policies/policies.json <<'EOF'
 {
@@ -92,7 +92,6 @@ RUN install -d -m 0755 /etc/firefox/policies \
 }
 EOF
 
-# TurboVNC.
 ARG TURBOVNC_VERSION=3.3
 
 RUN wget -q \
@@ -103,10 +102,8 @@ RUN wget -q \
     && rm -f /tmp/turbovnc.deb \
     && rm -rf /var/lib/apt/lists/*
 
-# VS Code Web.
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 
-# Usuario sin privilegios y directorios de trabajo.
 RUN useradd --create-home --shell /bin/bash ia \
     && install -d -m 0700 -o ia -g ia /home/ia/.vnc \
     && install -d -m 0755 -o ia -g ia \
@@ -120,9 +117,7 @@ RUN useradd --create-home --shell /bin/bash ia \
         'export PYTHONHISTFILE=/dev/null' \
         >> /etc/bash.bashrc
 
-ENV USER=ia \
-    HOME=/home/ia
-
+# Se declaran después de crear /home/ia.
 ENV USER=ia \
     HOME=/home/ia
 
