@@ -68,11 +68,11 @@ chown $USER:$USER "$HOME/.vnc/xstartup.turbovnc"
 echo "Iniciando TurboVNC..."
 su - $USER -c "$TURBOVNC/vncserver :1 -geometry 1920x1080 -rfbport 5901 -localhost"
 
-# 9. Iniciar noVNC Gateway en Dual-Stack IPv6/IPv4 (--listen=::6080) para Ingress de Salad Cloud
+# 9. Iniciar noVNC Gateway con formato IPv6 nativo de websockify ([::]:6080)
 if [ -d /usr/share/novnc ]; then
     cp /usr/share/novnc/vnc.html /usr/share/novnc/index.html 2>/dev/null || true
-    echo "Iniciando noVNC Web Gateway en Dual-Stack IPv6/IPv4 [::]:6080..."
-    websockify --web /usr/share/novnc --listen=::6080 127.0.0.1:5901 &
+    echo "Iniciando noVNC Web Gateway en [::]:6080..."
+    websockify --web /usr/share/novnc [::]:6080 127.0.0.1:5901 &
 fi
 
 # 10. Configurar VS Code Web Cero-Telemetría
