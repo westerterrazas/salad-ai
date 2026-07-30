@@ -6,9 +6,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-ENV USER=ia \
-    HOME=/home/ia \
-    LANG=en_US.UTF-8 \
+ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
     DISABLE_TELEMETRY=true \
     DO_NOT_TRACK=1 \
@@ -121,6 +119,9 @@ RUN useradd --create-home --shell /bin/bash ia \
         'export HISTFILE=/dev/null' \
         'export PYTHONHISTFILE=/dev/null' \
         >> /etc/bash.bashrc
+
+ENV USER=ia \
+    HOME=/home/ia
 
 COPY --chown=ia:ia --chmod=0755 \
     setup.sh \
