@@ -1,27 +1,38 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+manejar_error() {
+    codigo=$?
+    echo "[ERROR] Falló el arranque del contenedor. Código: $codigo" >&2
+    exit "$codigo"
+}
+
+trap manejar_error ERR
+
 echo "================================="
-echo " Salad AI Container - High Security"
+echo " Salad AI Container"
 echo "================================="
 
-echo ""
-echo "[1/2] Verificando Entorno..."
-if [ -f "$DIR/setup.sh" ]; then
+echo
+echo "[1/2] Verificando entorno..."
+
+if [[ -f "$DIR/setup.sh" ]]; then
     bash "$DIR/setup.sh"
+else
+    echo "[AVISO] No existe $DIR/setup.sh"
 fi
 
-echo ""
-echo "[2/2] Desplegando Servicios..."
-bash "$DIR/start-vnc.sh"
+if [[ ! -x "$DIR/start-vnc.sh" ]]; then
+    echo "[ERROR] start-vnc.sh no existe o no es ejecutable." >&2
+    exit 1
+fi
 
-echo ""
-echo "================================="
-echo " Salad AI LISTO Y EN ESPERA"
-echo "================================="
+echo
+echo "[2/2] Desplegando servicios..."
 
-# Redirección de logs a /dev/null para cero huella de datos/historial
-# Mantiene el contenedor en ejecución de forma pasiva y limpia
-exec tail -f /dev/null
+# Reemplaza el proceso principal del contenedor.
+# start-vnc.sh debe finalizar con:
+# exec websockify --web /usr/share/novnc "[::]:6080" 127.0.0.1:5901
+exec "$DIR/start-vnc.sh"

@@ -1,13 +1,16 @@
+# syntax=docker/dockerfile:1
+
 FROM nvidia/cuda:13.1.0-runtime-ubuntu24.04
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV USER=ia
-ENV HOME=/home/ia
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Bloque Estricto Anti-Telemetría y Privacidad
-ENV DISABLE_TELEMETRY=true \
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV USER=ia \
+    HOME=/home/ia \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    DISABLE_TELEMETRY=true \
     DO_NOT_TRACK=1 \
     DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     HF_HUB_DISABLE_TELEMETRY=1 \
@@ -17,90 +20,123 @@ ENV DISABLE_TELEMETRY=true \
     HISTFILE=/dev/null \
     PYTHONHISTFILE=/dev/null
 
-# 1. Paquetes base + XFCE + noVNC + Firefox + Tor + utilidades
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    curl \
-    git \
-    nano \
-    sudo \
-    iproute2 \
-    net-tools \
-    procps \
-    openssh-client \
-    xfce4 \
-    xfce4-goodies \
-    dbus-x11 \
-    xauth \
-    x11-xserver-utils \
-    mesa-utils \
-    xterm \
-    locales \
-    python3 \
-    python3-pip \
-    python3-venv \
-    ca-certificates \
-    novnc \
-    websockify \
-    dnsutils \
-    firefox \
-    tor \
+# Dependencias base, escritorio, VNC, Tor y herramientas.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        dbus-x11 \
+        dnsutils \
+        git \
+        gnupg \
+        iproute2 \
+        locales \
+        mesa-utils \
+        nano \
+        net-tools \
+        netcat-openbsd \
+        novnc \
+        openssh-client \
+        procps \
+        python3 \
+        python3-pip \
+        python3-venv \
+        sudo \
+        tini \
+        tor \
+        websockify \
+        wget \
+        x11-xserver-utils \
+        xauth \
+        xfce4 \
+        xfce4-goodies \
+        xterm \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Configurar Políticas de Firefox para Forzar Proxy SOCKS de Tor de Forma Segura
-RUN mkdir -p /etc/firefox/policies
-RUN echo '{ \
-  "policies": { \
-    "Proxy": { \
-      "Mode": "manual", \
-      "SOCKSProxy": "127.0.0.1:9050", \
-      "SOCKSVersion": 5, \
-      "UseDNS": true, \
-      "Locked": true \
-    }, \
-    "DisableTelemetry": true, \
-    "DisableFormHistory": true, \
-    "AutofillAddressEnabled": false, \
-    "AutofillCreditCardEnabled": false \
-  } \
-}' > /etc/firefox/policies/policies.json
-
-# 3. Instalar TurboVNC
-RUN wget -q \
-    https://github.com/TurboVNC/turbovnc/releases/download/3.3/turbovnc_3.3_amd64.deb \
-    -O /tmp/turbovnc.deb \
+# Firefox DEB oficial de Mozilla, evitando el paquete Snap de Ubuntu.
+RUN install -d -m 0755 /etc/apt/keyrings \
+    && wget -q \
+        https://packages.mozilla.org/apt/repo-signing-key.gpg \
+        -O /etc/apt/keyrings/packages.mozilla.org.asc \
+    && HUELLA="$(gpg --batch --quiet --show-keys --with-colons \
+        /etc/apt/keyrings/packages.mozilla.org.asc \
+        | awk -F: '$1=="fpr"{print $10; exit}')" \
+    && test "${HUELLA}" = "35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3" \
+    && echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" \
+        > /etc/apt/sources.list.d/mozilla.list \
+    && printf '%s\n' \
+        'Package: *' \
+        'Pin: origin packages.mozilla.org' \
+        'Pin-Priority: 1000' \
+        > /etc/apt/preferences.d/mozilla \
     && apt-get update \
-    && apt-get install -y /tmp/turbovnc.deb \
+    && apt-get install -y --no-install-recommends firefox \
+    && rm -rf /var/lib/apt/lists/*
+
+# Políticas de privacidad y proxy SOCKS5 mediante Tor.
+RUN install -d -m 0755 /etc/firefox/policies \
+    && cat > /etc/firefox/policies/policies.json <<'EOF'
+{
+  "policies": {
+    "Proxy": {
+      "Mode": "manual",
+      "SOCKSProxy": "127.0.0.1:9050",
+      "SOCKSVersion": 5,
+      "UseDNS": true,
+      "Locked": true
+    },
+    "DisableTelemetry": true,
+    "DisableFormHistory": true,
+    "AutofillAddressEnabled": false,
+    "AutofillCreditCardEnabled": false
+  }
+}
+EOF
+
+# TurboVNC.
+ARG TURBOVNC_VERSION=3.3
+
+RUN wget -q \
+        "https://github.com/TurboVNC/turbovnc/releases/download/${TURBOVNC_VERSION}/turbovnc_${TURBOVNC_VERSION}_amd64.deb" \
+        -O /tmp/turbovnc.deb \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends /tmp/turbovnc.deb \
     && rm -f /tmp/turbovnc.deb \
     && rm -rf /var/lib/apt/lists/*
 
-# 4. Instalar VS Code Web (code-server)
+# VS Code Web.
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 
-# 5. Crear Usuario y Estructura de Directorios Aislada
-RUN useradd -m -s /bin/bash ia \
-    && mkdir -p /home/ia/.vnc /home/ia/.config /tmp/.X11-unix /workspace /data /models \
-    && chmod 700 /home/ia/.vnc \
-    && chmod 1777 /tmp/.X11-unix \
-    && chown -R ia:ia /home/ia /workspace /data /models
+# Usuario sin privilegios y directorios de trabajo.
+RUN useradd --create-home --shell /bin/bash ia \
+    && install -d -m 0700 -o ia -g ia /home/ia/.vnc \
+    && install -d -m 0755 -o ia -g ia \
+        /home/ia/.config \
+        /workspace \
+        /data \
+        /models \
+    && install -d -m 1777 /tmp/.X11-unix \
+    && printf '%s\n' \
+        'export HISTFILE=/dev/null' \
+        'export PYTHONHISTFILE=/dev/null' \
+        >> /etc/bash.bashrc
 
-# 6. Desactivar historial persistentemente
-RUN echo "export HISTFILE=/dev/null" >> /etc/bash.bashrc \
-    && echo "export PYTHONHISTFILE=/dev/null" >> /etc/bash.bashrc
-
-# 7. Copiar Scripts
-COPY setup.sh /workspace/setup.sh
-COPY start-vnc.sh /workspace/start-vnc.sh
-COPY launch.sh /workspace/launch.sh
-
-RUN chmod +x /workspace/*.sh && chown -R ia:ia /workspace
+COPY --chown=ia:ia --chmod=0755 \
+    setup.sh \
+    start-vnc.sh \
+    launch.sh \
+    /workspace/
 
 WORKDIR /workspace
 
 EXPOSE 6080 8080
 
-HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:6080/ || exit 1
+HEALTHCHECK \
+    --interval=10s \
+    --timeout=5s \
+    --start-period=30s \
+    --retries=3 \
+    CMD ["curl", "-gfsS", "--noproxy", "*", "http://[::1]:6080/"]
 
-ENTRYPOINT ["/workspace/launch.sh"]
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/workspace/launch.sh"]

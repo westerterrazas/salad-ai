@@ -1,106 +1,197 @@
-#!/bin/bash
-set -e
+```bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
-USER=ia
-HOME=/home/$USER
-TURBOVNC=/opt/TurboVNC/bin
+USUARIO="ia"
+HOME_USUARIO="/home/${USUARIO}"
+TURBOVNC="/opt/TurboVNC/bin"
+PUERTO_VNC=5901
+PUERTO_NOVNC=6080
+PUERTO_CODE=8080
+
+CODE_PID=""
+NOVNC_PID=""
+
+limpiar() {
+    echo "[INFO] Deteniendo servicios..."
+
+    [[ -n "$NOVNC_PID" ]] && kill "$NOVNC_PID" 2>/dev/null || true
+    [[ -n "$CODE_PID" ]] && kill "$CODE_PID" 2>/dev/null || true
+
+    sudo -u "$USUARIO" \
+        "$TURBOVNC/vncserver" -kill :1 \
+        >/dev/null 2>&1 || true
+}
+
+trap limpiar EXIT INT TERM
 
 echo "=================================================="
-echo " ⚡ Starting Hardened AI Environment (Tor Integrated)"
+echo " Salad AI — entorno gráfico"
 echo "=================================================="
 
-# 1. Regenerar Machine-ID Único por Instancia (Elimina Huella Digital)
-if [ -f /etc/machine-id ]; then
-    tr -dc 'a-f0-9' < /dev/urandom | head -c 32 > /etc/machine-id 2>/dev/null || true
+if [[ -z "${VNC_PASSWORD:-}" ]]; then
+    echo "[ERROR] VNC_PASSWORD no está definida." >&2
+    exit 1
 fi
 
-# 2. Configurar DNS Privados (Cloudflare / Quad9) si resolv.conf es escribible
-if [ -w /etc/resolv.conf ]; then
-    echo "nameserver 1.1.1.1" > /etc/resolv.conf
-    echo "nameserver 9.9.9.9" >> /etc/resolv.conf
-fi
+CONTRASENA="$VNC_PASSWORD"
 
-# 3. Configurar Seguridad y Contraseñas (Sudo protegido con VNC_PASSWORD)
-IF_PASS="${VNC_PASSWORD:-}"
-if [ -z "$IF_PASS" ]; then
-    IF_PASS=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16)
-    echo "⚠️ ADVERTENCIA: VNC_PASSWORD no definida en Salad Cloud."
-    echo "🔑 Contraseña autogenerada: $IF_PASS"
-else
-    echo "🔒 Usando VNC_PASSWORD configurada en Salad Cloud."
-fi
+for comando in sudo nc websockify code-server; do
+    command -v "$comando" >/dev/null 2>&1 || {
+        echo "[ERROR] Comando no disponible: $comando" >&2
+        exit 1
+    }
+done
 
-echo "$USER:$IF_PASS" | chpasswd
-echo "$USER ALL=(ALL:ALL) ALL" > /etc/sudoers.d/ia-security
+[[ -x "$TURBOVNC/vncserver" ]] || {
+    echo "[ERROR] TurboVNC no está instalado." >&2
+    exit 1
+}
+
+install -d -m 0700 -o "$USUARIO" -g "$USUARIO" \
+    "$HOME_USUARIO/.vnc" \
+    "$HOME_USUARIO/.tor"
+
+install -d -m 0755 -o "$USUARIO" -g "$USUARIO" \
+    "$HOME_USUARIO/.local/share/code-server/User"
+
+install -d -m 1777 /tmp/.X11-unix
+
+echo "$USUARIO:$CONTRASENA" | chpasswd
+
+printf '%s\n' "$USUARIO ALL=(ALL:ALL) ALL" \
+    > /etc/sudoers.d/ia-security
 chmod 0440 /etc/sudoers.d/ia-security
 
-# 4. Anular Historiales de Consola
-ln -sf /dev/null "$HOME/.bash_history" 2>/dev/null || true
-ln -sf /dev/null "$HOME/.python_history" 2>/dev/null || true
+ln -sf /dev/null "$HOME_USUARIO/.bash_history"
+ln -sf /dev/null "$HOME_USUARIO/.python_history"
 
-# 5. Limpieza Inicial de Temporales
-rm -rf /tmp/* /tmp/.* 2>/dev/null || true
-mkdir -p /tmp/.X11-unix
-chmod 1777 /tmp/.X11-unix
+printf '%s\n' "$CONTRASENA" |
+    "$TURBOVNC/vncpasswd" -f \
+    > "$HOME_USUARIO/.vnc/passwd"
 
-# 6. Iniciar Tor local en segundo plano para el proxy SOCKS de Firefox (Puerto 9050)
-if command -v tor &> /dev/null; then
-    echo "Iniciando servicio Tor local..."
-    su - $USER -c "tor --RunAsDaemon 1 --SocksPort 9050 >/dev/null 2>&1 &"
-fi
+chmod 0600 "$HOME_USUARIO/.vnc/passwd"
 
-# 7. Configurar TurboVNC
-mkdir -p "$HOME/.vnc"
-chmod 700 "$HOME/.vnc"
-echo "$IF_PASS" | $TURBOVNC/vncpasswd -f > "$HOME/.vnc/passwd"
-chmod 600 "$HOME/.vnc/passwd"
-chown -R $USER:$USER "$HOME/.vnc"
-
-# 8. Configurar XFCE
-cat > "$HOME/.vnc/xstartup.turbovnc" <<'EOF'
-#!/bin/bash
+cat > "$HOME_USUARIO/.vnc/xstartup.turbovnc" <<'EOF'
+#!/usr/bin/env bash
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
-xset s off
-xset -dpms
-xfconf-query -c xfce4-session -p /general/SaveOnExit -s false 2>/dev/null || true
-exec startxfce4
+
+xset s off 2>/dev/null || true
+xset -dpms 2>/dev/null || true
+
+xfconf-query \
+    -c xfce4-session \
+    -p /general/SaveOnExit \
+    -s false 2>/dev/null || true
+
+exec dbus-launch --exit-with-session startxfce4
 EOF
 
-chmod +x "$HOME/.vnc/xstartup.turbovnc"
-chown $USER:$USER "$HOME/.vnc/xstartup.turbovnc"
+chmod 0755 "$HOME_USUARIO/.vnc/xstartup.turbovnc"
+chown -R "$USUARIO:$USUARIO" \
+    "$HOME_USUARIO/.vnc" \
+    "$HOME_USUARIO/.local" \
+    "$HOME_USUARIO/.tor"
 
-# 9. Iniciar TurboVNC local
-echo "Iniciando TurboVNC..."
-su - $USER -c "$TURBOVNC/vncserver :1 -geometry 1920x1080 -rfbport 5901 -localhost"
+if command -v tor >/dev/null 2>&1; then
+    echo "[INFO] Iniciando Tor..."
 
-# 10. Iniciar noVNC Gateway con formato IPv6 nativo de websockify ([::]:6080)
-if [ -d /usr/share/novnc ]; then
-    cp /usr/share/novnc/vnc.html /usr/share/novnc/index.html 2>/dev/null || true
-    echo "Iniciando noVNC Web Gateway en [::]:6080..."
-    websockify --web /usr/share/novnc [::]:6080 127.0.0.1:5901 &
+    sudo -u "$USUARIO" -H tor \
+        --DataDirectory "$HOME_USUARIO/.tor" \
+        --SocksPort "127.0.0.1:9050" \
+        --RunAsDaemon 1
 fi
 
-# 11. Configurar VS Code Web Cero-Telemetría
-mkdir -p "$HOME/.local/share/code-server/User"
-cat <<'EOF' > "$HOME/.local/share/code-server/User/settings.json"
+echo "[INFO] Iniciando TurboVNC..."
+
+sudo -u "$USUARIO" \
+    "$TURBOVNC/vncserver" -kill :1 \
+    >/dev/null 2>&1 || true
+
+sudo -u "$USUARIO" -H \
+    "$TURBOVNC/vncserver" :1 \
+    -geometry 1920x1080 \
+    -depth 24 \
+    -rfbport "$PUERTO_VNC" \
+    -localhost
+
+for intento in {1..30}; do
+    if nc -z 127.0.0.1 "$PUERTO_VNC" 2>/dev/null; then
+        echo "[OK] TurboVNC disponible."
+        break
+    fi
+
+    if [[ "$intento" -eq 30 ]]; then
+        echo "[ERROR] TurboVNC no abrió el puerto $PUERTO_VNC." >&2
+        exit 1
+    fi
+
+    sleep 1
+done
+
+cat > "$HOME_USUARIO/.local/share/code-server/User/settings.json" <<'EOF'
 {
   "telemetry.telemetryLevel": "off",
   "workbench.enableExperiments": false,
-  "update.mode": "off",
+  "update.mode": "none",
   "extensions.autoCheckUpdates": false,
   "extensions.autoUpdate": false
 }
 EOF
-chown -R $USER:$USER "$HOME/.local"
 
-su - $USER -c "DISABLE_TELEMETRY=true PASSWORD='$IF_PASS' code-server --bind-addr [::]:8080 --disable-telemetry --auth password /workspace >/dev/null 2>&1 &"
+chown -R "$USUARIO:$USUARIO" "$HOME_USUARIO/.local"
 
-echo ""
+echo "[INFO] Iniciando code-server..."
+
+sudo -u "$USUARIO" -H env \
+    HOME="$HOME_USUARIO" \
+    DISABLE_TELEMETRY=true \
+    PASSWORD="$CONTRASENA" \
+    code-server \
+        --bind-addr "[::]:${PUERTO_CODE}" \
+        --disable-telemetry \
+        --auth password \
+        /workspace &
+
+CODE_PID=$!
+
+sleep 2
+
+kill -0 "$CODE_PID" 2>/dev/null || {
+    echo "[ERROR] code-server terminó durante el arranque." >&2
+    exit 1
+}
+
+[[ -d /usr/share/novnc ]] || {
+    echo "[ERROR] No existe /usr/share/novnc." >&2
+    exit 1
+}
+
+cp -f /usr/share/novnc/vnc.html \
+    /usr/share/novnc/index.html
+
+echo "[INFO] Iniciando noVNC en [::]:${PUERTO_NOVNC}..."
+
+websockify \
+    --web /usr/share/novnc \
+    "[::]:${PUERTO_NOVNC}" \
+    "127.0.0.1:${PUERTO_VNC}" &
+
+NOVNC_PID=$!
+
 echo "=================================================="
-echo " 🚀 ENTORNO LISTO Y RENDIMIENTO MÁXIMO"
-echo "  - Escritorio noVNC: Puerto 6080"
-echo "  - VS Code Web: Puerto 8080"
-echo "  - Tor SOCKS5 Proxy: Puerto 9050 (Firefox integrado)"
-echo "  - Conexión: Directa a velocidad nativa Gbps"
+echo " noVNC:       puerto ${PUERTO_NOVNC}"
+echo " code-server: puerto ${PUERTO_CODE}"
+echo " TurboVNC:    127.0.0.1:${PUERTO_VNC}"
 echo "=================================================="
+
+# Si noVNC o code-server muere, termina el contenedor.
+set +e
+wait -n "$CODE_PID" "$NOVNC_PID"
+ESTADO=$?
+set -e
+
+echo "[ERROR] Un servicio principal terminó. Código: $ESTADO" >&2
+exit "$ESTADO"
+```
