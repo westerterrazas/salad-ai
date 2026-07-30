@@ -36,6 +36,6 @@ jobs:
           sbom: false
           tags: |
             westerterrazas/salad-ai:latest
-            westerterrazas/salad-ai:xfce-firefox-v1
+            westerterrazas/salad-ai:ai-v2
           cache-from: type=gha
           cache-to: type=gha,mode=max

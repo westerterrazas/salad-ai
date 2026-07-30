@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM nvidia/cuda:13.1.0-runtime-ubuntu24.04
+FROM nvidia/cuda:12.8.2-cudnn-runtime-ubuntu24.04
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -20,11 +20,19 @@ ENV LANG=en_US.UTF-8 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     HISTFILE=/dev/null \
-    PYTHONHISTFILE=/dev/null
+    PYTHONHISTFILE=/dev/null \
+    VIRTUAL_ENV=/opt/venv \
+    OPENNSFW2_HOME=/models/opennsfw2 \
+    TF_CPP_MIN_LOG_LEVEL=2 \
+    QT_X11_NO_MITSHM=1
+
+ENV PATH="/opt/venv/bin:${PATH}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        build-essential \
         ca-certificates \
+        cmake \
         curl \
         dbus-x11 \
         ffmpeg \
@@ -33,6 +41,17 @@ RUN apt-get update \
         git \
         gnupg \
         libavcodec-extra \
+        libegl1 \
+        libgl1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxkbcommon-x11-0 \
+        libxcb-cursor0 \
+        libxcb-xinerama0 \
+        libxcb-xinput0 \
+        libxrender1 \
+        pkg-config \
         locales \
         mesa-utils \
         nano \
@@ -41,6 +60,8 @@ RUN apt-get update \
         novnc \
         procps \
         python3 \
+        python3-dev \
+        python3-pip \
         python3-venv \
         sudo \
         tini \
@@ -53,6 +74,17 @@ RUN apt-get update \
         xterm \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt constraints.txt /tmp/
+
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/python -m pip install --no-cache-dir --upgrade \
+        pip wheel "setuptools==75.8.2" "Cython==3.0.12" \
+    && PIP_CONSTRAINT=/tmp/constraints.txt \
+        /opt/venv/bin/python -m pip install --no-cache-dir \
+        -r /tmp/requirements.txt \
+    && /opt/venv/bin/python -m pip check \
+    && rm -rf /root/.cache
 
 # Firefox oficial Mozilla en formato DEB, no Snap.
 RUN install -d -m 0755 /etc/apt/keyrings \
@@ -186,7 +218,10 @@ COPY --chown=ia:ia --chmod=0755 \
     launch.sh \
     healthcheck.sh \
     verificar-navegador.sh \
+    verificar-ia.sh \
     /workspace/
+
+RUN /workspace/verificar-ia.sh
 
 WORKDIR /workspace
 
