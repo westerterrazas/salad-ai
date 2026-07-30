@@ -9,7 +9,9 @@ echo "================================="
 
 echo ""
 echo "[1/2] Verificando Entorno..."
-bash "$DIR/setup.sh"
+if [ -f "$DIR/setup.sh" ]; then
+    bash "$DIR/setup.sh"
+fi
 
 echo ""
 echo "[2/2] Desplegando Servicios..."
@@ -20,9 +22,6 @@ echo "================================="
 echo " Salad AI LISTO Y EN ESPERA"
 echo "================================="
 
-# Pre-crear archivos de log para prevenir fallos en tail
-touch /tmp/code-server.log /home/ia/.vnc/container.log
-chown ia:ia /tmp/code-server.log /home/ia/.vnc/container.log 2>/dev/null || true
-
-# Mantener vivo el contenedor monitoreando logs
-exec tail -f /tmp/code-server.log /home/ia/.vnc/*.log
+# Redirección de logs a /dev/null para cero huella de datos/historial
+# Mantiene el contenedor en ejecución de forma pasiva y limpia
+exec tail -f /dev/null

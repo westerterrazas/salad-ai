@@ -6,8 +6,19 @@ ENV HOME=/home/ia
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
+# Bloque Estricto Anti-Telemetría y Privacidad
+ENV DISABLE_TELEMETRY=true \
+    DO_NOT_TRACK=1 \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    ANONYMIZED_TELEMETRY=false \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    HISTFILE=/dev/null \
+    PYTHONHISTFILE=/dev/null
+
 # 1. Paquetes base + XFCE + noVNC + utilidades
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
     git \
@@ -31,6 +42,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     novnc \
     websockify \
+    dnsutils \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -46,15 +58,18 @@ RUN wget -q \
 # 3. Instalar VS Code Web (code-server)
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 
-# 4. Crear Usuario y Estructura de Directorios con Permisos Exactos
+# 4. Crear Usuario y Estructura de Directorios Aislada
 RUN useradd -m -s /bin/bash ia \
-    && echo "ia ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
     && mkdir -p /home/ia/.vnc /home/ia/.config /tmp/.X11-unix /workspace /data /models \
     && chmod 700 /home/ia/.vnc \
     && chmod 1777 /tmp/.X11-unix \
     && chown -R ia:ia /home/ia /workspace /data /models
 
-# 5. Copiar Scripts
+# 5. Desactivar historial persistentemente
+RUN echo "export HISTFILE=/dev/null" >> /etc/bash.bashrc \
+    && echo "export PYTHONHISTFILE=/dev/null" >> /etc/bash.bashrc
+
+# 6. Copiar Scripts
 COPY setup.sh /workspace/setup.sh
 COPY start-vnc.sh /workspace/start-vnc.sh
 COPY launch.sh /workspace/launch.sh
@@ -62,5 +77,10 @@ COPY launch.sh /workspace/launch.sh
 RUN chmod +x /workspace/*.sh && chown -R ia:ia /workspace
 
 WORKDIR /workspace
+
+EXPOSE 6080 8080
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:6080/ || exit 1
 
 ENTRYPOINT ["/workspace/launch.sh"]
