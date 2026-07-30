@@ -17,7 +17,7 @@ ENV DISABLE_TELEMETRY=true \
     HISTFILE=/dev/null \
     PYTHONHISTFILE=/dev/null
 
-# 1. Paquetes base + XFCE + noVNC + utilidades
+# 1. Paquetes base + XFCE + noVNC + Firefox + Tor + utilidades
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
@@ -43,10 +43,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     novnc \
     websockify \
     dnsutils \
+    firefox \
+    tor \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Instalar TurboVNC
+# 2. Configurar Políticas de Firefox para Forzar Proxy SOCKS de Tor de Forma Segura
+RUN mkdir -p /etc/firefox/policies
+RUN echo '{ \
+  "policies": { \
+    "Proxy": { \
+      "Mode": "manual", \
+      "SOCKSProxy": "127.0.0.1:9050", \
+      "SOCKSVersion": 5, \
+      "UseDNS": true, \
+      "Locked": true \
+    }, \
+    "DisableTelemetry": true, \
+    "DisableFormHistory": true, \
+    "AutofillAddressEnabled": false, \
+    "AutofillCreditCardEnabled": false \
+  } \
+}' > /etc/firefox/policies/policies.json
+
+# 3. Instalar TurboVNC
 RUN wget -q \
     https://github.com/TurboVNC/turbovnc/releases/download/3.3/turbovnc_3.3_amd64.deb \
     -O /tmp/turbovnc.deb \
@@ -55,21 +75,21 @@ RUN wget -q \
     && rm -f /tmp/turbovnc.deb \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Instalar VS Code Web (code-server)
+# 4. Instalar VS Code Web (code-server)
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 
-# 4. Crear Usuario y Estructura de Directorios Aislada
+# 5. Crear Usuario y Estructura de Directorios Aislada
 RUN useradd -m -s /bin/bash ia \
     && mkdir -p /home/ia/.vnc /home/ia/.config /tmp/.X11-unix /workspace /data /models \
     && chmod 700 /home/ia/.vnc \
     && chmod 1777 /tmp/.X11-unix \
     && chown -R ia:ia /home/ia /workspace /data /models
 
-# 5. Desactivar historial persistentemente
+# 6. Desactivar historial persistentemente
 RUN echo "export HISTFILE=/dev/null" >> /etc/bash.bashrc \
     && echo "export PYTHONHISTFILE=/dev/null" >> /etc/bash.bashrc
 
-# 6. Copiar Scripts
+# 7. Copiar Scripts
 COPY setup.sh /workspace/setup.sh
 COPY start-vnc.sh /workspace/start-vnc.sh
 COPY launch.sh /workspace/launch.sh

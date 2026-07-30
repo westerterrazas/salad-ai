@@ -6,7 +6,7 @@ HOME=/home/$USER
 TURBOVNC=/opt/TurboVNC/bin
 
 echo "=================================================="
-echo " ⚡ Starting Hardened AI Environment (No Tor)"
+echo " ⚡ Starting Hardened AI Environment (Tor Integrated)"
 echo "=================================================="
 
 # 1. Regenerar Machine-ID Único por Instancia (Elimina Huella Digital)
@@ -43,14 +43,20 @@ rm -rf /tmp/* /tmp/.* 2>/dev/null || true
 mkdir -p /tmp/.X11-unix
 chmod 1777 /tmp/.X11-unix
 
-# 6. Configurar TurboVNC
+# 6. Iniciar Tor local en segundo plano para el proxy SOCKS de Firefox (Puerto 9050)
+if command -v tor &> /dev/null; then
+    echo "Iniciando servicio Tor local..."
+    su - $USER -c "tor --RunAsDaemon 1 --SocksPort 9050 >/dev/null 2>&1 &"
+fi
+
+# 7. Configurar TurboVNC
 mkdir -p "$HOME/.vnc"
 chmod 700 "$HOME/.vnc"
 echo "$IF_PASS" | $TURBOVNC/vncpasswd -f > "$HOME/.vnc/passwd"
 chmod 600 "$HOME/.vnc/passwd"
 chown -R $USER:$USER "$HOME/.vnc"
 
-# 7. Configurar XFCE
+# 8. Configurar XFCE
 cat > "$HOME/.vnc/xstartup.turbovnc" <<'EOF'
 #!/bin/bash
 unset SESSION_MANAGER
@@ -64,18 +70,18 @@ EOF
 chmod +x "$HOME/.vnc/xstartup.turbovnc"
 chown $USER:$USER "$HOME/.vnc/xstartup.turbovnc"
 
-# 8. Iniciar TurboVNC local
+# 9. Iniciar TurboVNC local
 echo "Iniciando TurboVNC..."
 su - $USER -c "$TURBOVNC/vncserver :1 -geometry 1920x1080 -rfbport 5901 -localhost"
 
-# 9. Iniciar noVNC Gateway con formato IPv6 nativo de websockify ([::]:6080)
+# 10. Iniciar noVNC Gateway con formato IPv6 nativo de websockify ([::]:6080)
 if [ -d /usr/share/novnc ]; then
     cp /usr/share/novnc/vnc.html /usr/share/novnc/index.html 2>/dev/null || true
     echo "Iniciando noVNC Web Gateway en [::]:6080..."
     websockify --web /usr/share/novnc [::]:6080 127.0.0.1:5901 &
 fi
 
-# 10. Configurar VS Code Web Cero-Telemetría
+# 11. Configurar VS Code Web Cero-Telemetría
 mkdir -p "$HOME/.local/share/code-server/User"
 cat <<'EOF' > "$HOME/.local/share/code-server/User/settings.json"
 {
@@ -95,5 +101,6 @@ echo "=================================================="
 echo " 🚀 ENTORNO LISTO Y RENDIMIENTO MÁXIMO"
 echo "  - Escritorio noVNC: Puerto 6080"
 echo "  - VS Code Web: Puerto 8080"
+echo "  - Tor SOCKS5 Proxy: Puerto 9050 (Firefox integrado)"
 echo "  - Conexión: Directa a velocidad nativa Gbps"
 echo "=================================================="
