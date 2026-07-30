@@ -1,6 +1,9 @@
+.git
+.github
+*.zip
 *.log
 *.tmp
-*.zip
+__pycache__/
 models/
 data/
 .vnc/

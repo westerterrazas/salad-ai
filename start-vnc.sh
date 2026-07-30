@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -7,26 +6,29 @@ HOME_USUARIO="/home/${USUARIO}"
 TURBOVNC="/opt/TurboVNC/bin"
 PUERTO_VNC=5901
 PUERTO_NOVNC=6080
-PUERTO_CODE=8080
 
-CODE_PID=""
-NOVNC_PID=""
+PIDS=()
 
 limpiar() {
+    local codigo=$?
+    trap - EXIT INT TERM
     echo "[INFO] Deteniendo servicios..."
 
-    [[ -n "$NOVNC_PID" ]] && kill "$NOVNC_PID" 2>/dev/null || true
-    [[ -n "$CODE_PID" ]] && kill "$CODE_PID" 2>/dev/null || true
+    if ((${#PIDS[@]} > 0)); then
+        kill "${PIDS[@]}" 2>/dev/null || true
+        wait "${PIDS[@]}" 2>/dev/null || true
+    fi
 
-    sudo -u "$USUARIO" \
-        "$TURBOVNC/vncserver" -kill :1 \
+    sudo -u "$USUARIO" "$TURBOVNC/vncserver" -kill :1 \
         >/dev/null 2>&1 || true
+
+    exit "$codigo"
 }
 
 trap limpiar EXIT INT TERM
 
 echo "=================================================="
-echo " Salad AI — entorno gráfico"
+echo " Salad AI — entorno gráfico privado"
 echo "=================================================="
 
 if [[ -z "${VNC_PASSWORD:-}" ]]; then
@@ -34,11 +36,14 @@ if [[ -z "${VNC_PASSWORD:-}" ]]; then
     exit 1
 fi
 
-CONTRASENA="$VNC_PASSWORD"
+if ((${#VNC_PASSWORD} < 8)); then
+    echo "[ERROR] VNC_PASSWORD debe tener al menos 8 caracteres." >&2
+    exit 1
+fi
 
-for comando in sudo nc websockify code-server; do
+for comando in sudo nc curl websockify; do
     command -v "$comando" >/dev/null 2>&1 || {
-        echo "[ERROR] Comando no disponible: $comando" >&2
+        echo "[ERROR] Comando no disponible: ${comando}" >&2
         exit 1
     }
 done
@@ -49,30 +54,23 @@ done
 }
 
 install -d -m 0700 -o "$USUARIO" -g "$USUARIO" \
-    "$HOME_USUARIO/.vnc" \
-    "$HOME_USUARIO/.tor"
+    "$HOME_USUARIO/.vnc"
 
 install -d -m 0755 -o "$USUARIO" -g "$USUARIO" \
     "$HOME_USUARIO/.local/share/code-server/User"
 
 install -d -m 1777 /tmp/.X11-unix
 
-echo "$USUARIO:$CONTRASENA" | chpasswd
-
-printf '%s\n' "$USUARIO ALL=(ALL:ALL) ALL" \
-    > /etc/sudoers.d/ia-security
-chmod 0440 /etc/sudoers.d/ia-security
-
 ln -sf /dev/null "$HOME_USUARIO/.bash_history"
 ln -sf /dev/null "$HOME_USUARIO/.python_history"
 
-printf '%s\n' "$CONTRASENA" |
-    "$TURBOVNC/vncpasswd" -f \
+printf '%s\n' "$VNC_PASSWORD" \
+    | "$TURBOVNC/vncpasswd" -f \
     > "$HOME_USUARIO/.vnc/passwd"
 
 chmod 0600 "$HOME_USUARIO/.vnc/passwd"
 
-cat > "$HOME_USUARIO/.vnc/xstartup.turbovnc" <<'EOF'
+cat > "$HOME_USUARIO/.vnc/xstartup.turbovnc" <<'XSTARTUP'
 #!/usr/bin/env bash
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
@@ -86,51 +84,46 @@ xfconf-query \
     -s false 2>/dev/null || true
 
 exec dbus-launch --exit-with-session startxfce4
-EOF
+XSTARTUP
 
 chmod 0755 "$HOME_USUARIO/.vnc/xstartup.turbovnc"
+
 chown -R "$USUARIO:$USUARIO" \
     "$HOME_USUARIO/.vnc" \
-    "$HOME_USUARIO/.local" \
-    "$HOME_USUARIO/.tor"
-
-if command -v tor >/dev/null 2>&1; then
-    echo "[INFO] Iniciando Tor..."
-
-    sudo -u "$USUARIO" -H tor \
-        --DataDirectory "$HOME_USUARIO/.tor" \
-        --SocksPort "127.0.0.1:9050" \
-        --RunAsDaemon 1
-fi
+    "$HOME_USUARIO/.local"
 
 echo "[INFO] Iniciando TurboVNC..."
 
-sudo -u "$USUARIO" \
-    "$TURBOVNC/vncserver" -kill :1 \
+sudo -u "$USUARIO" "$TURBOVNC/vncserver" -kill :1 \
     >/dev/null 2>&1 || true
 
-sudo -u "$USUARIO" -H \
-    "$TURBOVNC/vncserver" :1 \
-    -geometry 1920x1080 \
+sudo -u "$USUARIO" -H "$TURBOVNC/vncserver" :1 \
+    -geometry "${VNC_GEOMETRY:-1920x1080}" \
     -depth 24 \
     -rfbport "$PUERTO_VNC" \
     -localhost
 
-for intento in {1..30}; do
+for intento in {1..45}; do
     if nc -z 127.0.0.1 "$PUERTO_VNC" 2>/dev/null; then
-        echo "[OK] TurboVNC disponible."
+        echo "[OK] TurboVNC disponible en 127.0.0.1:${PUERTO_VNC}."
         break
     fi
 
-    if [[ "$intento" -eq 30 ]]; then
-        echo "[ERROR] TurboVNC no abrió el puerto $PUERTO_VNC." >&2
+    if [[ "$intento" -eq 45 ]]; then
+        echo "[ERROR] TurboVNC no abrió el puerto ${PUERTO_VNC}." >&2
         exit 1
     fi
 
     sleep 1
 done
 
-cat > "$HOME_USUARIO/.local/share/code-server/User/settings.json" <<'EOF'
+if [[ "${ENABLE_CODE_SERVER:-true}" == "true" ]]; then
+    if [[ -z "${CODE_PASSWORD:-}" ]]; then
+        echo "[ERROR] CODE_PASSWORD es obligatoria." >&2
+        exit 1
+    fi
+
+    cat > "$HOME_USUARIO/.local/share/code-server/User/settings.json" <<'JSON'
 {
   "telemetry.telemetryLevel": "off",
   "workbench.enableExperiments": false,
@@ -138,60 +131,73 @@ cat > "$HOME_USUARIO/.local/share/code-server/User/settings.json" <<'EOF'
   "extensions.autoCheckUpdates": false,
   "extensions.autoUpdate": false
 }
-EOF
+JSON
 
-chown -R "$USUARIO:$USUARIO" "$HOME_USUARIO/.local"
+    chown -R "$USUARIO:$USUARIO" "$HOME_USUARIO/.local"
 
-echo "[INFO] Iniciando code-server..."
+    echo "[INFO] Iniciando code-server..."
 
-sudo -u "$USUARIO" -H env \
-    HOME="$HOME_USUARIO" \
-    DISABLE_TELEMETRY=true \
-    PASSWORD="$CONTRASENA" \
-    code-server \
-        --bind-addr "[::]:${PUERTO_CODE}" \
-        --disable-telemetry \
-        --auth password \
-        /workspace &
+    sudo -u "$USUARIO" -H env \
+        HOME="$HOME_USUARIO" \
+        DISABLE_TELEMETRY=true \
+        PASSWORD="$CODE_PASSWORD" \
+        code-server \
+            --bind-addr "${CODE_SERVER_BIND:-127.0.0.1:8080}" \
+            --disable-telemetry \
+            --auth password \
+            /workspace &
 
-CODE_PID=$!
+    PIDS+=("$!")
+fi
 
-sleep 2
-
-kill -0 "$CODE_PID" 2>/dev/null || {
-    echo "[ERROR] code-server terminó durante el arranque." >&2
-    exit 1
-}
-
-[[ -d /usr/share/novnc ]] || {
-    echo "[ERROR] No existe /usr/share/novnc." >&2
-    exit 1
-}
-
-cp -f /usr/share/novnc/vnc.html \
-    /usr/share/novnc/index.html
+WEBSOCKIFY_ARGS=(
+    --web /usr/share/novnc
+    --heartbeat 30
+    "[::]:${PUERTO_NOVNC}"
+    "127.0.0.1:${PUERTO_VNC}"
+)
 
 echo "[INFO] Iniciando noVNC en [::]:${PUERTO_NOVNC}..."
 
-websockify \
-    --web /usr/share/novnc \
-    "[::]:${PUERTO_NOVNC}" \
-    "127.0.0.1:${PUERTO_VNC}" &
+sudo -u "$USUARIO" -H \
+    websockify "${WEBSOCKIFY_ARGS[@]}" &
 
-NOVNC_PID=$!
+PIDS+=("$!")
+
+supervisar() {
+    while sleep 5; do
+        nc -z 127.0.0.1 "$PUERTO_VNC" 2>/dev/null || {
+            echo "[ERROR] TurboVNC dejó de responder." >&2
+            return 1
+        }
+
+        curl -gfsS \
+            --max-time 3 \
+            --noproxy '*' \
+            http://[::1]:6080/ >/dev/null || {
+                echo "[ERROR] noVNC dejó de responder." >&2
+                return 1
+            }
+    done
+}
+
+supervisar &
+PIDS+=("$!")
 
 echo "=================================================="
-echo " noVNC:       puerto ${PUERTO_NOVNC}"
-echo " code-server: puerto ${PUERTO_CODE}"
+echo " noVNC:       [::]:${PUERTO_NOVNC}"
 echo " TurboVNC:    127.0.0.1:${PUERTO_VNC}"
+
+if [[ "${ENABLE_CODE_SERVER:-true}" == "true" ]]; then
+    echo " code-server: ${CODE_SERVER_BIND:-127.0.0.1:8080}"
+fi
+
 echo "=================================================="
 
-# Si noVNC o code-server muere, termina el contenedor.
 set +e
-wait -n "$CODE_PID" "$NOVNC_PID"
+wait -n "${PIDS[@]}"
 ESTADO=$?
 set -e
 
-echo "[ERROR] Un servicio principal terminó. Código: $ESTADO" >&2
+echo "[ERROR] Un servicio principal terminó. Código: ${ESTADO}" >&2
 exit "$ESTADO"
-```
