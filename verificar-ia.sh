@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-python3 - <<'PY'
+/opt/venv/bin/python - <<'PY'
 import cv2
 import insightface
 import numpy
