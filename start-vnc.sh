@@ -54,16 +54,46 @@ done
 }
 
 install -d -m 0700 -o "$USUARIO" -g "$USUARIO" \
-    "$HOME_USUARIO/.vnc"
+    "$HOME_USUARIO/.vnc" \
+    "$HOME_USUARIO/.cache" \
+    "$HOME_USUARIO/.cache/mozilla" \
+    "$HOME_USUARIO/.cache/matplotlib" \
+    "$HOME_USUARIO/.mozilla" \
+    "$HOME_USUARIO/.keras" \
+    /tmp/runtime-ia
 
 install -d -m 0755 -o "$USUARIO" -g "$USUARIO" \
-    "$HOME_USUARIO/.local/share/code-server/User"
+    "$HOME_USUARIO/.config/autostart" \
+    "$HOME_USUARIO/.config/xfce4/xfconf/xfce-perchannel-xml" \
+    "$HOME_USUARIO/.local/share/code-server/User" \
+    "$HOME_USUARIO/.local/state"
 
 install -d -m 1777 /tmp/.X11-unix
 
-ln -sf /dev/null "$HOME_USUARIO/.bash_history"
-ln -sf /dev/null "$HOME_USUARIO/.python_history"
+AJUSTES_XFCE="$HOME_USUARIO/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml"
 
+if [[ ! -s "$AJUSTES_XFCE" ]]; then
+    cat > "$AJUSTES_XFCE" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xsettings" version="1.0">
+  <property name="Net" type="empty">
+    <property name="ThemeName" type="string" value="Adwaita"/>
+    <property name="IconThemeName" type="string" value="elementary-xfce"/>
+  </property>
+</channel>
+XML
+fi
+
+rm -f "$HOME_USUARIO/.bash_history" "$HOME_USUARIO/.python_history"
+
+chown -hR "$USUARIO:$USUARIO" "$HOME_USUARIO"
+
+ln -s /dev/null "$HOME_USUARIO/.bash_history"
+ln -s /dev/null "$HOME_USUARIO/.python_history"
+
+chown -h "$USUARIO:$USUARIO" \
+    "$HOME_USUARIO/.bash_history" \
+    "$HOME_USUARIO/.python_history"
 printf '%s\n' "$VNC_PASSWORD" \
     | "$TURBOVNC/vncpasswd" -f \
     > "$HOME_USUARIO/.vnc/passwd"
@@ -72,8 +102,19 @@ chmod 0600 "$HOME_USUARIO/.vnc/passwd"
 
 cat > "$HOME_USUARIO/.vnc/xstartup.turbovnc" <<'XSTARTUP'
 #!/usr/bin/env bash
+export HOME=/home/ia
+export XDG_CACHE_HOME="$HOME/.cache"
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_STATE_HOME="$HOME/.local/state"
+export XDG_RUNTIME_DIR=/tmp/runtime-ia
+export KERAS_HOME="$HOME/.keras"
+export MPLCONFIGDIR="$HOME/.cache/matplotlib"
+
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
+
+xdg-user-dirs-update 2>/dev/null || true
 
 xset s off 2>/dev/null || true
 xset -dpms 2>/dev/null || true

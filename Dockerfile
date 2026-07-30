@@ -35,6 +35,17 @@ RUN apt-get update \
         cmake \
         curl \
         dbus-x11 \
+        adwaita-icon-theme \
+        desktop-file-utils \
+        elementary-xfce-icon-theme \
+        gvfs \
+        gvfs-backends \
+        hicolor-icon-theme \
+        libgtk-3-bin \
+        policykit-1-gnome \
+        shared-mime-info \
+        tumbler \
+        xdg-user-dirs \
         ffmpeg \
         fonts-liberation \
         fonts-noto-color-emoji \
@@ -208,6 +219,13 @@ RUN useradd --create-home --shell /bin/bash ia \
 
 ENV USER=ia \
     HOME=/home/ia \
+    XDG_CACHE_HOME=/home/ia/.cache \
+    XDG_CONFIG_HOME=/home/ia/.config \
+    XDG_DATA_HOME=/home/ia/.local/share \
+    XDG_STATE_HOME=/home/ia/.local/state \
+    XDG_RUNTIME_DIR=/tmp/runtime-ia \
+    KERAS_HOME=/home/ia/.keras \
+    MPLCONFIGDIR=/home/ia/.cache/matplotlib \
     ENABLE_CODE_SERVER=true \
     CODE_SERVER_BIND=127.0.0.1:8080 \
     REQUIRE_GPU=false
@@ -221,7 +239,29 @@ COPY --chown=ia:ia --chmod=0755 \
     verificar-ia.sh \
     /workspace/
 
-RUN /workspace/verificar-ia.sh
+RUN install -d -m 0700 -o ia -g ia /tmp/verificacion-ia \
+    && sudo -u ia -H env \
+       HOME=/tmp/verificacion-ia \
+       XDG_CACHE_HOME=/tmp/verificacion-ia/.cache \
+       XDG_CONFIG_HOME=/tmp/verificacion-ia/.config \
+       XDG_DATA_HOME=/tmp/verificacion-ia/.local/share \
+       XDG_STATE_HOME=/tmp/verificacion-ia/.local/state \
+       KERAS_HOME=/tmp/verificacion-ia/.keras \
+       MPLCONFIGDIR=/tmp/verificacion-ia/matplotlib \
+       /workspace/verificar-ia.sh \
+    && rm -rf /tmp/verificacion-ia \
+    && install -d -m 0700 -o ia -g ia \
+       /home/ia/.cache \
+       /home/ia/.cache/mozilla \
+       /home/ia/.cache/matplotlib \
+       /home/ia/.mozilla \
+       /home/ia/.keras \
+       /tmp/runtime-ia \
+    && install -d -m 0755 -o ia -g ia \
+       /home/ia/.config \
+       /home/ia/.local/share \
+       /home/ia/.local/state \
+    && chown -hR ia:ia /home/ia
 
 WORKDIR /workspace
 
