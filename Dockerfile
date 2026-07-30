@@ -123,6 +123,9 @@ RUN useradd --create-home --shell /bin/bash ia \
 ENV USER=ia \
     HOME=/home/ia
 
+ENV USER=ia \
+    HOME=/home/ia
+
 COPY --chown=ia:ia --chmod=0755 \
     setup.sh \
     start-vnc.sh \
