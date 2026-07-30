@@ -6,7 +6,7 @@ ENV HOME=/home/ia
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
-# Paquetes base + escritorio XFCE + VNC + noVNC
+# 1. Paquetes base + XFCE + noVNC + utilidades
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
@@ -28,13 +28,13 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
+    ca-certificates \
     novnc \
     websockify \
-    ca-certificates \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalación de TurboVNC
+# 2. Instalar TurboVNC
 RUN wget -q \
     https://github.com/TurboVNC/turbovnc/releases/download/3.3/turbovnc_3.3_amd64.deb \
     -O /tmp/turbovnc.deb \
@@ -43,29 +43,23 @@ RUN wget -q \
     && rm -f /tmp/turbovnc.deb \
     && rm -rf /var/lib/apt/lists/*
 
-# Crear Usuario IA y asignar permisos
-RUN useradd -m -s /bin/bash ia \
-    && echo "ia ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# 3. Instalar VS Code Web (code-server)
+RUN curl -fsSL https://code-server.dev/install.sh | sh
 
-# Configuración de Directorios
-RUN mkdir -p \
-        /home/ia/.vnc \
-        /tmp/.X11-unix \
-        /workspace \
-        /data \
-        /models \
+# 4. Crear Usuario y Estructura de Directorios con Permisos Exactos
+RUN useradd -m -s /bin/bash ia \
+    && echo "ia ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+    && mkdir -p /home/ia/.vnc /home/ia/.config /tmp/.X11-unix /workspace /data /models \
+    && chmod 700 /home/ia/.vnc \
     && chmod 1777 /tmp/.X11-unix \
     && chown -R ia:ia /home/ia /workspace /data /models
 
-# Scripts de Arranque
+# 5. Copiar Scripts
 COPY setup.sh /workspace/setup.sh
 COPY start-vnc.sh /workspace/start-vnc.sh
 COPY launch.sh /workspace/launch.sh
 
-RUN chmod +x /workspace/*.sh
-
-# Definir puerto de noVNC para el Gateway de Salad Cloud
-EXPOSE 6080
+RUN chmod +x /workspace/*.sh && chown -R ia:ia /workspace
 
 WORKDIR /workspace
 

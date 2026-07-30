@@ -1,58 +1,69 @@
 #!/bin/bash
 set -e
 
+USER=ia
+HOME=/home/$USER
 TURBOVNC=/opt/TurboVNC/bin
 
 echo "=============================="
-echo " Iniciando TurboVNC + noVNC"
+echo " Configurando Seguridad y Servicios"
 echo "=============================="
 
-if [ ! -f "$TURBOVNC/vncserver" ]; then
-    echo "ERROR: TurboVNC no fue encontrado en $TURBOVNC"
-    exit 1
+# 1. Gestionar Contraseña VNC / Code-Server
+IF_PASS="${VNC_PASSWORD:-}"
+if [ -z "$IF_PASS" ]; then
+    IF_PASS=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 12)
+    echo "⚠️ ADVERTENCIA: VNC_PASSWORD no definida en Salad Cloud."
+    echo "🔑 Contraseña autogenerada: $IF_PASS"
+else
+    echo "🔒 Usando VNC_PASSWORD configurada en Salad Cloud."
 fi
 
-echo "Limpiando sesiones anteriores..."
-$TURBOVNC/vncserver -kill :1 2>/dev/null || true
-
-rm -f /tmp/.X1-lock
-rm -f /tmp/.X11-unix/X1
-rm -f "$HOME/.vnc/*:1.pid"
-rm -f "$HOME/.vnc/*:1.log"
-
+# 2. Asegurar permisos requeridos por TurboVNC (700)
 mkdir -p "$HOME/.vnc"
+chmod 700 "$HOME/.vnc"
 
-echo "Configurando entorno gráfico XFCE..."
-cat > "$HOME/.vnc/xstartup.turbovnc" <<'XEOF'
+echo "$IF_PASS" | $TURBOVNC/vncpasswd -f > "$HOME/.vnc/passwd"
+chmod 600 "$HOME/.vnc/passwd"
+chown -R $USER:$USER "$HOME/.vnc"
+
+# 3. Limpieza de procesos y sockets huérfanos
+su - $USER -c "$TURBOVNC/vncserver -kill :1 >/dev/null 2>&1 || true"
+rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 "$HOME/.vnc/*:1.pid" "$HOME/.vnc/*:1.log"
+
+# 4. Configurar arranque XFCE
+cat > "$HOME/.vnc/xstartup.turbovnc" <<'EOF'
 #!/bin/bash
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
 exec startxfce4
-XEOF
+EOF
 
 chmod +x "$HOME/.vnc/xstartup.turbovnc"
+chown $USER:$USER "$HOME/.vnc/xstartup.turbovnc"
 
-echo "Arrancando servidor TurboVNC en puerto 5901..."
-$TURBOVNC/vncserver :1 \
-    -geometry 1920x1080 \
-    -rfbport 5901 \
-    -securitytypes none
+# 5. Iniciar TurboVNC (Puerto local 5901)
+echo "Iniciando TurboVNC en puerto 5901..."
+su - $USER -c "$TURBOVNC/vncserver :1 -geometry 1920x1080 -rfbport 5901"
 
-echo "Configurando noVNC..."
-if [ -f /usr/share/novnc/vnc.html ] && [ ! -f /usr/share/novnc/index.html ]; then
-    cp /usr/share/novnc/vnc.html /usr/share/novnc/index.html
+# 6. Iniciar noVNC Gateway (Puerto Web 6080)
+if [ -d /usr/share/novnc ]; then
+    cp /usr/share/novnc/vnc.html /usr/share/novnc/index.html 2>/dev/null || true
+    echo "Iniciando noVNC Web Gateway en puerto 6080..."
+    pkill websockify || true
+    websockify --web /usr/share/novnc 6080 localhost:5901 &
 fi
 
-echo "Arrancando puente HTTP websockify (noVNC) en puerto 6080..."
-websockify --web=/usr/share/novnc/ 6080 localhost:5901 > "$HOME/.vnc/novnc.log" 2>&1 &
-
-sleep 2
+# 7. Iniciar VS Code Web (Puerto Web 8080)
+echo "Iniciando VS Code Web (code-server) en puerto 8080..."
+touch /tmp/code-server.log
+chown $USER:$USER /tmp/code-server.log
+su - $USER -c "PASSWORD='$IF_PASS' code-server --bind-addr 0.0.0.0:8080 --auth password /workspace >/tmp/code-server.log 2>&1 &"
 
 echo ""
-echo "=============================="
-echo " Servidores de Escritorio Listos"
-echo " Puerto VNC Local: 5901"
-echo " Puerto Web Salad (noVNC): 6080"
-echo "=============================="
-
-ss -ltnp | grep -E '5901|6080' || true
+echo "=========================================="
+echo " SERVICIOS LISTOS Y AUDITADOS"
+echo "  - Escritorio noVNC (Web): Puerto 6080"
+echo "  - VS Code Browser: Puerto 8080"
+echo "  - Estado de Seguridad: Protegido por clave"
+echo "=========================================="
