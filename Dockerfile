@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.22-alpine AS croc-builder
+FROM golang:1.25.12-alpine AS croc-builder
 ARG CROC_VERSION=v10.4.4
 RUN CGO_ENABLED=0 GOBIN=/out     go install github.com/schollz/croc/v10@${CROC_VERSION}
 
