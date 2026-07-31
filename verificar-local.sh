@@ -5,6 +5,7 @@ IMAGEN="${IMAGEN:-salad-ai:local}"
 CONTENEDOR="${CONTENEDOR:-salad-ai-local}"
 VNC_PASSWORD="${VNC_PASSWORD:-CambiaEstaClaveVNC}"
 CODE_PASSWORD="${CODE_PASSWORD:-CambiaEstaClaveCode}"
+IA_PASSWORD="${IA_PASSWORD:-CambiaEstaClaveSudo123}"
 USE_GPU="${USE_GPU:-false}"
 
 ARGS_GPU=()
@@ -41,6 +42,8 @@ docker run -d \
     "${ARGS_GPU[@]}" \
     -e VNC_PASSWORD="$VNC_PASSWORD" \
     -e CODE_PASSWORD="$CODE_PASSWORD" \
+    -e IA_PASSWORD="$IA_PASSWORD" \
+    -e ENABLE_SUDO=true \
     -e ENABLE_CODE_SERVER=true \
     -e CODE_SERVER_BIND=127.0.0.1:8080 \
     -p 6080:6080 \
@@ -82,6 +85,7 @@ docker exec "$CONTENEDOR" \
 
 docker exec "$CONTENEDOR" /workspace/healthcheck.sh
 docker exec "$CONTENEDOR" /workspace/verificar-navegador.sh
+docker exec "$CONTENEDOR" /workspace/verificar-herramientas.sh
 
 RESPUESTA_WS="$(curl \
     --http1.1 \

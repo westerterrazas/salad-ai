@@ -1,8 +1,14 @@
 # syntax=docker/dockerfile:1
 
+FROM golang:1.22-alpine AS croc-builder
+ARG CROC_VERSION=v10.4.4
+RUN CGO_ENABLED=0 GOBIN=/out     go install github.com/schollz/croc/v10@${CROC_VERSION}
+
 FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+COPY --from=croc-builder /out/croc /usr/local/bin/croc
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG TURBOVNC_VERSION=3.3
@@ -46,6 +52,22 @@ RUN apt-get update \
         shared-mime-info \
         tumbler \
         xdg-user-dirs \
+        bzip2 \
+        cabextract \
+        file-roller \
+        gzip \
+        lz4 \
+        openssh-client \
+        p7zip-full \
+        rclone \
+        rsync \
+        tar \
+        thunar-archive-plugin \
+        unar \
+        unzip \
+        xz-utils \
+        zip \
+        zstd \
         ffmpeg \
         fonts-liberation \
         fonts-noto-color-emoji \
@@ -202,6 +224,13 @@ RUN wget -q \
     && rm -f /tmp/code-server.tar.gz
 
 RUN useradd --create-home --shell /bin/bash ia \
+    && usermod -aG sudo ia \
+    && printf '%s\n' \
+        'ia ALL=(ALL:ALL) ALL' \
+        'Defaults:ia timestamp_timeout=15' \
+        > /etc/sudoers.d/ia \
+    && chmod 0440 /etc/sudoers.d/ia \
+    && visudo -cf /etc/sudoers.d/ia \
     && passwd -l ia \
     && install -d -m 0700 -o ia -g ia /home/ia/.vnc \
     && install -d -m 0755 -o ia -g ia \
@@ -210,6 +239,12 @@ RUN useradd --create-home --shell /bin/bash ia \
         /workspace \
         /data \
         /models \
+    && install -d -m 0700 -o ia -g ia \
+        /home/ia/.config/croc \
+        /home/ia/.config/rclone \
+    && install -d -m 0755 -o ia -g ia \
+        /data/recibidos \
+        /data/salidas \
     && install -d -m 1777 /tmp/.X11-unix \
     && printf '%s\n' \
         'export HISTFILE=/dev/null' \
@@ -226,6 +261,7 @@ ENV USER=ia \
     XDG_RUNTIME_DIR=/tmp/runtime-ia \
     KERAS_HOME=/home/ia/.keras \
     MPLCONFIGDIR=/home/ia/.cache/matplotlib \
+    ENABLE_SUDO=true \
     ENABLE_CODE_SERVER=true \
     CODE_SERVER_BIND=127.0.0.1:8080 \
     REQUIRE_GPU=false
@@ -237,7 +273,14 @@ COPY --chown=ia:ia --chmod=0755 \
     healthcheck.sh \
     verificar-navegador.sh \
     verificar-ia.sh \
+    verificar-herramientas.sh \
+    enviar-archivo.sh \
+    recibir-archivo.sh \
+    configurar-rclone.sh \
+    respaldar-cifrado.sh \
     /workspace/
+
+RUN /workspace/verificar-herramientas.sh
 
 RUN install -d -m 0700 -o ia -g ia /tmp/verificacion-ia \
     && sudo -u ia -H env \
