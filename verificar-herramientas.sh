@@ -33,6 +33,6 @@ find /usr/lib \
 visudo -cf /etc/sudoers.d/ia >/dev/null
 croc --version
 rclone version | head -n 2
-codium --version | head -n 1
+dpkg-query -W -f='${Version}\n' codium
 
 echo "[OK] Herramientas de IA, desarrollo, archivos y privacidad disponibles."
