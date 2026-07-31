@@ -26,3 +26,7 @@ if [[ "${ENABLE_CODE_SERVER:-true}" == "true" ]]; then
             "http://127.0.0.1:${puerto}/healthz" >/dev/null
     fi
 fi
+
+if [[ "${SECURE_DNS_ENABLED:-true}" == "true" ]]; then
+    /workspace/verificar-dns-seguro.sh >/dev/null
+fi

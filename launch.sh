@@ -32,5 +32,8 @@ else
     passwd -l "$USUARIO" >/dev/null 2>&1 || true
 fi
 
+source "${DIR}/iniciar-dns-seguro.sh"
+iniciar_dns_seguro
+
 "${DIR}/setup.sh"
 exec "${DIR}/start-vnc.sh"

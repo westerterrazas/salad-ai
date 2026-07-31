@@ -9,6 +9,16 @@ PUERTO_NOVNC=6080
 
 PIDS=()
 
+if [[ -s /run/dnscrypt-proxy.pid ]]; then
+    DNSCRYPT_PID="$(cat /run/dnscrypt-proxy.pid)"
+    if kill -0 "$DNSCRYPT_PID" 2>/dev/null; then
+        PIDS+=("$DNSCRYPT_PID")
+    elif [[ "${SECURE_DNS_REQUIRED:-true}" == "true" ]]; then
+        echo "[ERROR] dnscrypt-proxy no está activo." >&2
+        exit 1
+    fi
+fi
+
 limpiar() {
     local codigo=$?
     trap - EXIT INT TERM
@@ -41,7 +51,7 @@ if ((${#VNC_PASSWORD} < 8)); then
     exit 1
 fi
 
-for comando in sudo nc curl websockify; do
+for comando in sudo nc curl websockify dig; do
     command -v "$comando" >/dev/null 2>&1 || {
         echo "[ERROR] Comando no disponible: ${comando}" >&2
         exit 1
@@ -64,6 +74,7 @@ install -d -m 0700 -o "$USUARIO" -g "$USUARIO" \
 
 install -d -m 0755 -o "$USUARIO" -g "$USUARIO" \
     "$HOME_USUARIO/.config/autostart" \
+    "$HOME_USUARIO/.config/VSCodium/User" \
     "$HOME_USUARIO/.config/xfce4/xfconf/xfce-perchannel-xml" \
     "$HOME_USUARIO/.local/share/code-server/User" \
     "$HOME_USUARIO/.local/state"
@@ -157,6 +168,21 @@ for intento in {1..45}; do
 
     sleep 1
 done
+
+VSCODIUM_SETTINGS="$HOME_USUARIO/.config/VSCodium/User/settings.json"
+cat > "$VSCODIUM_SETTINGS" <<'JSON'
+{
+  "telemetry.telemetryLevel": "off",
+  "workbench.enableExperiments": false,
+  "update.mode": "none",
+  "extensions.autoCheckUpdates": false,
+  "extensions.autoUpdate": false,
+  "security.workspace.trust.enabled": true,
+  "files.autoSave": "afterDelay",
+  "terminal.integrated.enablePersistentSessions": false
+}
+JSON
+chown "$USUARIO:$USUARIO" "$VSCODIUM_SETTINGS"
 
 if [[ "${ENABLE_CODE_SERVER:-true}" == "true" ]]; then
     if [[ -z "${CODE_PASSWORD:-}" ]]; then

@@ -265,3 +265,36 @@ No puede garantizarse “cero tráfico externo”: Firefox, YouTube, descarga de
 * DRM/Widevine está deshabilitado.
 * YouTube HTML5 funciona, pero el sonido no llega al navegador cliente mediante noVNC.
 * Los modelos de IA deben almacenarse en `/models` o descargarse desde una fuente controlada.
+
+
+## AI v5: desarrollo y DNS cifrado
+
+Incluye VSCodium, toolchains C/C++, Rust, Go y Node.js, depuradores,
+clientes de bases de datos y utilidades de terminal.
+
+El DNS del sistema utiliza `dnscrypt-proxy` en `127.0.0.1:53` con
+resolutores cifrados y relays de DNS anonimizado:
+
+```text
+Aplicaciones → dnscrypt-proxy → relay → resolver cifrado
+```
+
+Variables:
+
+```text
+SECURE_DNS_ENABLED=true
+SECURE_DNS_REQUIRED=true
+```
+
+Verificación:
+
+```bash
+/workspace/verificar-dns-seguro.sh
+/workspace/verificar-herramientas.sh
+```
+
+Firefox fuerza HTTPS-Only, utiliza el DNS seguro del sistema, instala
+uBlock Origin y mantiene deshabilitada su telemetría.
+
+El DNS cifrado oculta las consultas DNS en texto claro, pero no oculta
+a la infraestructura las IP de destino ni proporciona anonimato total.

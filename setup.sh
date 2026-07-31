@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 USUARIO="ia"
-DIRECTORIOS=(/data /models /workspace)
+DIRECTORIOS=(/data /data/descargas /data/recibidos /data/salidas /models /workspace)
 
 echo "=============================="
 echo " Diagnóstico del sistema"
@@ -39,6 +39,10 @@ elif [[ "${REQUIRE_GPU:-false}" == "true" ]]; then
     exit 1
 else
     echo "[AVISO] GPU no disponible; válido para prueba sin GPU."
+fi
+
+if [[ "${SECURE_DNS_ENABLED:-true}" == "true" ]]; then
+    /workspace/verificar-dns-seguro.sh
 fi
 
 python3 --version

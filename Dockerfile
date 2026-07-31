@@ -30,6 +30,8 @@ ENV LANG=en_US.UTF-8 \
     VIRTUAL_ENV=/opt/venv \
     OPENNSFW2_HOME=/models/opennsfw2 \
     TF_CPP_MIN_LOG_LEVEL=2 \
+    GH_TELEMETRY_DISABLED=1 \
+    VSCODE_TELEMETRY_LEVEL=off \
     QT_X11_NO_MITSHM=1
 
 ENV PATH="/opt/venv/bin:${PATH}"
@@ -68,6 +70,33 @@ RUN apt-get update \
         xz-utils \
         zip \
         zstd \
+        bat \
+        btop \
+        cargo \
+        ccache \
+        clang \
+        clangd \
+        dnscrypt-proxy \
+        dnsutils \
+        fd-find \
+        fzf \
+        gdb \
+        git-lfs \
+        golang-go \
+        htop \
+        jq \
+        lldb \
+        ncdu \
+        ninja-build \
+        nodejs \
+        npm \
+        postgresql-client \
+        redis-tools \
+        ripgrep \
+        rustc \
+        shellcheck \
+        sqlite3 \
+        tmux \
         ffmpeg \
         fonts-liberation \
         fonts-noto-color-emoji \
@@ -106,6 +135,27 @@ RUN apt-get update \
         xfce4-goodies \
         xterm \
     && locale-gen en_US.UTF-8 \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# VSCodium: editor gráfico libre, repositorio recomendado por el proyecto.
+RUN wget -qO- \
+        https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg \
+        | gpg --dearmor \
+        > /usr/share/keyrings/vscodium-archive-keyring.gpg \
+    && printf '%s\n' \
+        'Types: deb' \
+        'URIs: https://download.vscodium.com/debs' \
+        'Suites: vscodium' \
+        'Components: main' \
+        'Architectures: amd64' \
+        'Signed-by: /usr/share/keyrings/vscodium-archive-keyring.gpg' \
+        > /etc/apt/sources.list.d/vscodium.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends codium \
+    && ln -sf /usr/bin/fdfind /usr/local/bin/fd \
+    && ln -sf /usr/bin/batcat /usr/local/bin/bat \
+    && git lfs install --system \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt constraints.txt /tmp/
@@ -195,6 +245,58 @@ RUN cat > /usr/lib/firefox/distribution/policies.json <<'EOF'
       "media.autoplay.default": {
         "Value": 0,
         "Status": "default"
+      },
+      "privacy.trackingprotection.enabled": {
+        "Value": true,
+        "Status": "locked"
+      },
+      "privacy.trackingprotection.pbmode.enabled": {
+        "Value": true,
+        "Status": "locked"
+      },
+      "privacy.trackingprotection.socialtracking.enabled": {
+        "Value": true,
+        "Status": "locked"
+      },
+      "network.cookie.cookieBehavior": {
+        "Value": 5,
+        "Status": "locked"
+      },
+      "network.prefetch-next": {
+        "Value": false,
+        "Status": "locked"
+      },
+      "network.dns.disablePrefetch": {
+        "Value": true,
+        "Status": "locked"
+      },
+      "browser.urlbar.speculativeConnect.enabled": {
+        "Value": false,
+        "Status": "locked"
+      },
+      "network.http.speculative-parallel-limit": {
+        "Value": 0,
+        "Status": "locked"
+      }
+    },
+    "HttpsOnlyMode": "force_enabled",
+    "DNSOverHTTPS": {
+      "Enabled": false,
+      "Locked": true,
+      "Fallback": false
+    },
+    "DownloadDirectory": "/data/descargas",
+    "GenerativeAI": {
+      "Enabled": false,
+      "Chatbot": false,
+      "LinkPreviews": false,
+      "TabGroups": false,
+      "Locked": true
+    },
+    "ExtensionSettings": {
+      "uBlock0@raymondhill.net": {
+        "installation_mode": "force_installed",
+        "install_url": "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi"
       }
     }
   }
@@ -243,6 +345,7 @@ RUN useradd --create-home --shell /bin/bash ia \
         /home/ia/.config/croc \
         /home/ia/.config/rclone \
     && install -d -m 0755 -o ia -g ia \
+        /data/descargas \
         /data/recibidos \
         /data/salidas \
     && install -d -m 1777 /tmp/.X11-unix \
@@ -261,10 +364,14 @@ ENV USER=ia \
     XDG_RUNTIME_DIR=/tmp/runtime-ia \
     KERAS_HOME=/home/ia/.keras \
     MPLCONFIGDIR=/home/ia/.cache/matplotlib \
+    SECURE_DNS_ENABLED=true \
+    SECURE_DNS_REQUIRED=true \
     ENABLE_SUDO=true \
     ENABLE_CODE_SERVER=true \
     CODE_SERVER_BIND=127.0.0.1:8080 \
     REQUIRE_GPU=false
+
+COPY --chmod=0644 dnscrypt-proxy.toml /etc/dnscrypt-proxy/dnscrypt-proxy.toml
 
 COPY --chown=ia:ia --chmod=0755 \
     setup.sh \
@@ -278,6 +385,8 @@ COPY --chown=ia:ia --chmod=0755 \
     recibir-archivo.sh \
     configurar-rclone.sh \
     respaldar-cifrado.sh \
+    verificar-dns-seguro.sh \
+    iniciar-dns-seguro.sh \
     /workspace/
 
 RUN /workspace/verificar-herramientas.sh
