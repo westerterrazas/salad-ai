@@ -2,7 +2,19 @@
 set -Eeuo pipefail
 
 USUARIO="ia"
-DIRECTORIOS=(/data /data/descargas /data/recibidos /data/salidas /models /workspace)
+HOME_USUARIO="/home/${USUARIO}"
+VENV_USUARIO="/data/venvs/default"
+RUTA_USUARIO="${VENV_USUARIO}/bin:/opt/venv/bin:${HOME_USUARIO}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+DIRECTORIOS=(
+    /data
+    /data/descargas
+    /data/recibidos
+    /data/salidas
+    /data/venvs
+    /models
+    /workspace
+)
 
 echo "=============================="
 echo " Diagnóstico del sistema"
@@ -26,10 +38,45 @@ for directorio in "${DIRECTORIOS[@]}"; do
         }
 done
 
-command -v python3 >/dev/null 2>&1 || {
-    echo "[ERROR] Python 3 no está disponible." >&2
+[[ -x /usr/bin/python3 ]] || {
+    echo "[ERROR] Python 3 del sistema no está disponible." >&2
     exit 1
 }
+
+[[ -x /opt/venv/bin/python && -x /opt/venv/bin/pip ]] || {
+    echo "[ERROR] El entorno IA base /opt/venv está incompleto." >&2
+    exit 1
+}
+
+VERSION_SISTEMA="$(/usr/bin/python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+VERSION_VENV=""
+
+if [[ -x "${VENV_USUARIO}/bin/python" ]]; then
+    VERSION_VENV="$("${VENV_USUARIO}/bin/python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
+fi
+
+if [[ "$VERSION_VENV" != "$VERSION_SISTEMA" ]]; then
+    echo "[INFO] Creando entorno Python persistente para ${USUARIO}..."
+    rm -rf "$VENV_USUARIO"
+    sudo -u "$USUARIO" -H /usr/bin/python3 -m venv "$VENV_USUARIO"
+fi
+
+BASE_SITE="$(/opt/venv/bin/python -c 'import site; print(site.getsitepackages()[0])')"
+USUARIO_SITE="$(sudo -u "$USUARIO" -H "${VENV_USUARIO}/bin/python" -c 'import site; print(site.getsitepackages()[0])')"
+
+printf '%s\n' "$BASE_SITE" > "${USUARIO_SITE}/salad-ai-base.pth"
+chown "$USUARIO:$USUARIO" "${USUARIO_SITE}/salad-ai-base.pth"
+
+LINEA_PATH='export PATH="/data/venvs/default/bin:/opt/venv/bin:$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'
+touch "${HOME_USUARIO}/.bashrc"
+grep -qxF "$LINEA_PATH" "${HOME_USUARIO}/.bashrc" \
+    || printf '\n%s\n' "$LINEA_PATH" >> "${HOME_USUARIO}/.bashrc"
+chown "$USUARIO:$USUARIO" "${HOME_USUARIO}/.bashrc"
+
+sudo -u "$USUARIO" -H env PATH="$RUTA_USUARIO" python --version
+sudo -u "$USUARIO" -H env PATH="$RUTA_USUARIO" pip --version
+sudo -u "$USUARIO" -H env PATH="$RUTA_USUARIO" \
+    python -c 'import numpy; print("[OK] NumPy base accesible:", numpy.__version__)'
 
 if command -v nvidia-smi >/dev/null 2>&1 \
     && nvidia-smi >/dev/null 2>&1; then
@@ -45,8 +92,9 @@ if [[ "${SECURE_DNS_ENABLED:-true}" == "true" ]]; then
     /workspace/verificar-dns-seguro.sh
 fi
 
-python3 --version
 free -h || true
 df -h "${DIRECTORIOS[@]}" || true
 
+echo "[OK] Python del usuario: ${VENV_USUARIO}"
+echo "[OK] Python IA protegido: /opt/venv (python-ai / pip-ai)"
 echo "[OK] Diagnóstico completado."

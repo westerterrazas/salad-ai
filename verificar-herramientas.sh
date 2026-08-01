@@ -6,7 +6,7 @@ COMANDOS=(
     codium clang clangd gdb lldb cmake ninja ccache
     node npm go rustc cargo git-lfs jq rg fd bat
     shellcheck sqlite3 psql redis-cli tmux htop btop ncdu
-    dnscrypt-proxy dig
+    dnscrypt-proxy dig python python3 python-ai pip-ai
 )
 
 for comando in "${COMANDOS[@]}"; do
@@ -34,6 +34,9 @@ visudo -cf /etc/sudoers.d/ia >/dev/null
 croc --version
 rclone version | head -n 2
 dpkg-query -W -f='${Version}\n' codium
+/opt/venv/bin/python -m pip check
+/opt/venv/bin/python --version
+/opt/venv/bin/pip --version
 /usr/sbin/dnscrypt-proxy -config /etc/dnscrypt-proxy/dnscrypt-proxy.toml -check >/dev/null
 
 echo "[OK] Herramientas de IA, desarrollo, archivos y privacidad disponibles."

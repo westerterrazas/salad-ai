@@ -34,7 +34,7 @@ ENV LANG=en_US.UTF-8 \
     VSCODE_TELEMETRY_LEVEL=off \
     QT_X11_NO_MITSHM=1
 
-ENV PATH="/opt/venv/bin:${PATH}"
+ENV PATH="/data/venvs/default/bin:/opt/venv/bin:${PATH}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -125,6 +125,7 @@ RUN apt-get update \
         python3-dev \
         python3-pip \
         python3-venv \
+        python-is-python3 \
         sudo \
         tini \
         websockify \
@@ -167,6 +168,8 @@ RUN python3 -m venv /opt/venv \
         /opt/venv/bin/python -m pip install --no-cache-dir \
         -r /tmp/requirements.txt \
     && /opt/venv/bin/python -m pip check \
+    && ln -sf /opt/venv/bin/python /usr/local/bin/python-ai \
+    && ln -sf /opt/venv/bin/pip /usr/local/bin/pip-ai \
     && rm -rf /root/.cache
 
 # Firefox oficial Mozilla en formato DEB, no Snap.

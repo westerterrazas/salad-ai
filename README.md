@@ -308,3 +308,29 @@ mantiene el inicio en modo fail-closed si el resolver cifrado no funciona.
 
 Esto cifra las consultas DNS del sistema, pero la red que hospeda el
 contenedor todavía puede observar las IP de destino y metadatos de tráfico.
+
+## Python para el usuario ia
+
+La imagen mantiene dos entornos separados:
+
+```text
+python / pip       -> /data/venvs/default (persistente y escribible por ia)
+python-ai / pip-ai -> /opt/venv (stack IA protegido de la imagen)
+```
+
+El entorno persistente se crea automáticamente al arrancar y recibe un archivo
+`.pth` que permite importar las dependencias IA de `/opt/venv`. Los paquetes
+instalados con `pip install` se guardan en el volumen `/data` y no modifican el
+stack base.
+
+Ejemplos:
+
+```bash
+python --version
+pip --version
+pip install requests
+python -c 'import numpy, tensorflow; print(numpy.__version__)'
+python-ai -m pip check
+```
+
+No usar `sudo pip install`.

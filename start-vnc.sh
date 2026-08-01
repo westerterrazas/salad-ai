@@ -122,6 +122,7 @@ export XDG_STATE_HOME="$HOME/.local/state"
 export XDG_RUNTIME_DIR=/tmp/runtime-ia
 export KERAS_HOME="$HOME/.keras"
 export MPLCONFIGDIR="$HOME/.cache/matplotlib"
+export PATH="/data/venvs/default/bin:/opt/venv/bin:$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
@@ -207,6 +208,7 @@ JSON
 
     sudo -u "$USUARIO" -H env \
         HOME="$HOME_USUARIO" \
+        PATH="/data/venvs/default/bin:/opt/venv/bin:$HOME_USUARIO/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
         DISABLE_TELEMETRY=true \
         PASSWORD="$CODE_PASSWORD" \
         code-server \
