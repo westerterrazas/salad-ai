@@ -32,8 +32,8 @@ ENV LANG=en_US.UTF-8 \
     TF_CPP_MIN_LOG_LEVEL=2 \
     GH_TELEMETRY_DISABLED=1 \
     VSCODE_TELEMETRY_LEVEL=off \
-    QT_X11_NO_MITSHM=1
-
+    QT_X11_NO_MITSHM=1 \
+    QT_QPA_PLATFORM=xcb
 ENV PATH="/data/venvs/default/bin:/opt/venv/bin:${PATH}"
 
 RUN apt-get update \
@@ -104,6 +104,38 @@ RUN apt-get update \
         gnupg \
         libavcodec-extra \
         libegl1 \
+        libdbus-1-3 \
+        libdrm2 \
+        libfontconfig1 \
+        libfreetype6 \
+        libgbm1 \
+        libgles2 \
+        libopengl0 \
+        libvulkan1 \
+        libwayland-client0 \
+        libwayland-cursor0 \
+        libwayland-egl1 \
+        libx11-xcb1 \
+        libxcb1 \
+        libxcb-glx0 \
+        libxcb-icccm4 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-randr0 \
+        libxcb-render-util0 \
+        libxcb-shape0 \
+        libxcb-shm0 \
+        libxcb-sync1 \
+        libxcb-util1 \
+        libxcb-xfixes0 \
+        libxcb-xkb1 \
+        libxkbcommon0 \
+        mesa-vulkan-drivers \
+        qt6-base-dev \
+        qt6-base-dev-tools \
+        qt6-qpa-plugins \
+        qt6-tools-dev-tools \
+        qt6-wayland \
         libgl1 \
         libglib2.0-0 \
         libsm6 \
