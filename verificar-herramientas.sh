@@ -34,5 +34,6 @@ visudo -cf /etc/sudoers.d/ia >/dev/null
 croc --version
 rclone version | head -n 2
 dpkg-query -W -f='${Version}\n' codium
+/usr/sbin/dnscrypt-proxy -config /etc/dnscrypt-proxy/dnscrypt-proxy.toml -check >/dev/null
 
 echo "[OK] Herramientas de IA, desarrollo, archivos y privacidad disponibles."

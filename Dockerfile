@@ -279,7 +279,7 @@ RUN cat > /usr/lib/firefox/distribution/policies.json <<'EOF'
         "Status": "locked"
       }
     },
-    "HttpsOnlyMode": "force_enabled",
+    "HttpsOnlyMode": "enabled",
     "DNSOverHTTPS": {
       "Enabled": false,
       "Locked": true,
@@ -329,7 +329,7 @@ RUN useradd --create-home --shell /bin/bash ia \
     && usermod -aG sudo ia \
     && printf '%s\n' \
         'ia ALL=(ALL:ALL) ALL' \
-        'Defaults:ia timestamp_timeout=15' \
+        'Defaults:ia timestamp_timeout=5' \
         > /etc/sudoers.d/ia \
     && chmod 0440 /etc/sudoers.d/ia \
     && visudo -cf /etc/sudoers.d/ia \
@@ -372,6 +372,10 @@ ENV USER=ia \
     REQUIRE_GPU=false
 
 COPY --chmod=0644 dnscrypt-proxy.toml /etc/dnscrypt-proxy/dnscrypt-proxy.toml
+
+RUN /usr/sbin/dnscrypt-proxy \
+        -config /etc/dnscrypt-proxy/dnscrypt-proxy.toml \
+        -check
 
 COPY --chown=ia:ia --chmod=0755 \
     setup.sh \

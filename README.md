@@ -298,3 +298,13 @@ uBlock Origin y mantiene deshabilitada su telemetría.
 
 El DNS cifrado oculta las consultas DNS en texto claro, pero no oculta
 a la infraestructura las IP de destino ni proporciona anonimato total.
+
+## DNS seguro ai-v5.1
+
+El contenedor usa `dnscrypt-proxy` compatible con Ubuntu 24.04 y dos
+endpoints estáticos Quad9 DNS-over-HTTPS por puerto 443. No utiliza ODoH
+ni descarga listas remotas durante el arranque. `SECURE_DNS_REQUIRED=true`
+mantiene el inicio en modo fail-closed si el resolver cifrado no funciona.
+
+Esto cifra las consultas DNS del sistema, pero la red que hospeda el
+contenedor todavía puede observar las IP de destino y metadatos de tráfico.

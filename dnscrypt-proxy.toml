@@ -1,12 +1,14 @@
+server_names = ['quad9-doh-a', 'quad9-doh-b']
+
 listen_addresses = ['127.0.0.1:53']
 max_clients = 250
 user_name = 'nobody'
 
 ipv4_servers = true
 ipv6_servers = false
-dnscrypt_servers = true
-doh_servers = false
-odoh_servers = false
+
+dnscrypt_servers = false
+doh_servers = true
 
 require_dnssec = true
 require_nolog = true
@@ -17,12 +19,14 @@ timeout = 5000
 keepalive = 30
 lb_strategy = 'p2'
 
-bootstrap_resolvers = ['9.9.9.9:53', '149.112.112.112:53']
-netprobe_timeout = 30
-netprobe_address = '9.9.9.9:443'
-
 log_level = 2
 use_syslog = false
+
+tls_disable_session_tickets = true
+ignore_system_dns = true
+
+netprobe_timeout = 30
+netprobe_address = '9.9.9.9:443'
 
 block_ipv6 = true
 block_unqualified = true
@@ -35,28 +39,8 @@ cache_max_ttl = 86400
 cache_neg_min_ttl = 60
 cache_neg_max_ttl = 600
 
-[sources.public-resolvers]
-urls = [
-  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md',
-  'https://download.dnscrypt.info/resolvers-list/v3/public-resolvers.md'
-]
-cache_file = '/var/cache/dnscrypt-proxy/public-resolvers.md'
-minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
-refresh_delay = 72
-prefix = ''
+[static.'quad9-doh-a']
+stamp = 'sdns://AgMAAAAAAAAABzkuOS45LjkgsBkgdEu7dsmrBT4B4Ht-BQ5HPSD3n3vqQ1-v5DydJC8SZG5zOS5xdWFkOS5uZXQ6NDQzCi9kbnMtcXVlcnk'
 
-[sources.relays]
-urls = [
-  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/relays.md',
-  'https://download.dnscrypt.info/resolvers-list/v3/relays.md'
-]
-cache_file = '/var/cache/dnscrypt-proxy/relays.md'
-minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
-refresh_delay = 72
-prefix = ''
-
-[anonymized_dns]
-routes = [
-  { server_name='*', via=['*'] }
-]
-skip_incompatible = true
+[static.'quad9-doh-b']
+stamp = 'sdns://AgMAAAAAAAAADTE0OS4xMTIuMTEyLjkgsBkgdEu7dsmrBT4B4Ht-BQ5HPSD3n3vqQ1-v5DydJC8SZG5zOS5xdWFkOS5uZXQ6NDQzCi9kbnMtcXVlcnk'

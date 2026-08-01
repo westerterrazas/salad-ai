@@ -110,6 +110,7 @@ printf '%s\n' "$VNC_PASSWORD" \
     > "$HOME_USUARIO/.vnc/passwd"
 
 chmod 0600 "$HOME_USUARIO/.vnc/passwd"
+unset VNC_PASSWORD
 
 cat > "$HOME_USUARIO/.vnc/xstartup.turbovnc" <<'XSTARTUP'
 #!/usr/bin/env bash
@@ -215,6 +216,7 @@ JSON
             /workspace &
 
     PIDS+=("$!")
+    unset CODE_PASSWORD
 fi
 
 WEBSOCKIFY_ARGS=(

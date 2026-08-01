@@ -11,6 +11,11 @@ iniciar_dns_seguro() {
         return 1
     fi
 
+    local config="/etc/dnscrypt-proxy/dnscrypt-proxy.toml"
+    local log="/var/log/dnscrypt-proxy/dnscrypt-proxy.log"
+    local pidfile="/run/dnscrypt-proxy.pid"
+    local respaldo="/run/resolv.conf.salad-original"
+
     for comando in dnscrypt-proxy dig; do
         command -v "$comando" >/dev/null 2>&1 || {
             echo "[ERROR] Falta ${comando}." >&2
@@ -18,25 +23,23 @@ iniciar_dns_seguro() {
         }
     done
 
-    install -d -m 0755 /run
-    install -d -m 0750 -o nobody -g nogroup \
-        /var/cache/dnscrypt-proxy \
-        /var/log/dnscrypt-proxy
+    /usr/sbin/dnscrypt-proxy -config "$config" -check >/dev/null
 
-    if [[ ! -s /run/resolv.conf.salad-original ]]; then
-        cp -L /etc/resolv.conf /run/resolv.conf.salad-original
+    install -d -m 0755 /run
+    install -d -m 0750 -o nobody -g nogroup /var/log/dnscrypt-proxy
+
+    if [[ ! -s "$respaldo" ]]; then
+        cp -L /etc/resolv.conf "$respaldo"
+        chmod 0600 "$respaldo"
     fi
 
-    rm -f /run/dnscrypt-proxy.pid
-    : > /var/log/dnscrypt-proxy/dnscrypt-proxy.log
-    chown nobody:nogroup /var/log/dnscrypt-proxy/dnscrypt-proxy.log
+    rm -f "$pidfile"
+    : > "$log"
+    chown nobody:nogroup "$log"
 
-    /usr/sbin/dnscrypt-proxy \
-        -config /etc/dnscrypt-proxy/dnscrypt-proxy.toml \
-        >> /var/log/dnscrypt-proxy/dnscrypt-proxy.log 2>&1 &
-
+    /usr/sbin/dnscrypt-proxy -config "$config" >>"$log" 2>&1 &
     local pid=$!
-    printf '%s\n' "$pid" > /run/dnscrypt-proxy.pid
+    printf '%s\n' "$pid" > "$pidfile"
 
     local listo=false
     for _ in {1..45}; do
@@ -44,8 +47,8 @@ iniciar_dns_seguro() {
             break
         fi
 
-        if dig @127.0.0.1 example.com A \
-            +short +time=2 +tries=1 | grep -q .; then
+        if dig @127.0.0.1 example.com A +short +time=2 +tries=1 |
+            grep -q .; then
             listo=true
             break
         fi
@@ -54,32 +57,37 @@ iniciar_dns_seguro() {
 
     if [[ "$listo" != "true" ]]; then
         echo "[ERROR] dnscrypt-proxy no respondió." >&2
-        tail -n 100 /var/log/dnscrypt-proxy/dnscrypt-proxy.log >&2 || true
+        tail -n 100 "$log" >&2 || true
         kill "$pid" 2>/dev/null || true
         wait "$pid" 2>/dev/null || true
-        rm -f /run/dnscrypt-proxy.pid
+        rm -f "$pidfile"
 
         if [[ "${SECURE_DNS_REQUIRED:-true}" == "true" ]]; then
             return 1
         fi
 
-        cp /run/resolv.conf.salad-original /etc/resolv.conf
+        cat "$respaldo" > /etc/resolv.conf
         echo "[AVISO] Se restauró el DNS original."
         return 0
     fi
 
-    if ! printf '%s\n' \
-        'nameserver 127.0.0.1' \
-        'options edns0 trust-ad timeout:2 attempts:2' \
-        > /etc/resolv.conf; then
-        echo "[ERROR] No se pudo modificar /etc/resolv.conf." >&2
+    if [[ ! -w /etc/resolv.conf ]]; then
+        echo "[ERROR] /etc/resolv.conf no es escribible." >&2
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
         return 1
     fi
+
+    printf '%s\n'         'nameserver 127.0.0.1'         'options edns0 trust-ad timeout:2 attempts:2'         > /etc/resolv.conf
 
     if ! dig example.com A +short +time=2 +tries=1 | grep -q .; then
-        echo "[ERROR] El sistema no está resolviendo mediante dnscrypt-proxy." >&2
+        echo "[ERROR] El sistema no usa el resolver DNS cifrado." >&2
+        cat "$respaldo" > /etc/resolv.conf
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+        rm -f "$pidfile"
         return 1
     fi
 
-    echo "[OK] DNSCrypt cifrado y anonimizado activo en 127.0.0.1:53."
+    echo "[OK] DNS sobre HTTPS cifrado activo en 127.0.0.1:53."
 }
